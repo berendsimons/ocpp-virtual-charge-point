@@ -28,6 +28,15 @@ async function spawnCharger(charger: (typeof chargers)[0]) {
     endpoint: WS_URL,
     chargePointId: charger.cpId,
     ocppVersion: OcppVersion.OCPP_1_6,
+    config: {
+      chargePointVendor: charger.vendor,
+      chargePointModel: charger.model,
+      chargePointSerialNumber: charger.serialNumber,
+      firmwareVersion: charger.firmwareVersion,
+      numberOfConnectors: charger.connectors,
+      meterType: charger.meterType,
+      meterSerialNumber: charger.meterSerialNumber,
+    },
   });
 
   await vcp.connect();

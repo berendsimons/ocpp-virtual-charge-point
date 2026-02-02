@@ -23,13 +23,37 @@ import {
 import { TransactionManager } from "./transactionManager";
 import { heartbeatOcppMessage } from "./v16/messages/heartbeat";
 
+interface ChargePointConfig {
+  // Charger identity
+  chargePointVendor?: string;
+  chargePointModel?: string;
+  chargePointSerialNumber?: string;
+  firmwareVersion?: string;
+  // Charger capabilities
+  numberOfConnectors?: number;
+  // Meter configuration
+  meterType?: string;
+  meterSerialNumber?: string;
+  // Configuration values (can be overridden)
+  meterValueSampleInterval?: number;
+  heartbeatInterval?: number;
+  connectionTimeOut?: number;
+  // Authorization
+  authorizeRemoteTxRequests?: boolean;
+  localAuthorizeOffline?: boolean;
+  localPreAuthorize?: boolean;
+}
+
 interface VCPOptions {
   ocppVersion: OcppVersion;
   endpoint: string;
   chargePointId: string;
   basicAuthPassword?: string;
   adminPort?: number;
+  config?: ChargePointConfig;
 }
+
+export type { ChargePointConfig };
 
 interface LogEntry {
   type: "Application";
@@ -47,7 +71,11 @@ export class VCP {
 
   transactionManager = new TransactionManager();
 
+  // Charger-specific configuration accessible to message handlers
+  config: ChargePointConfig;
+
   constructor(private vcpOptions: VCPOptions) {
+    this.config = vcpOptions.config ?? {};
     this.messageHandler = resolveMessageHandler(vcpOptions.ocppVersion);
     if (vcpOptions.adminPort) {
       const adminApi = new Hono();
