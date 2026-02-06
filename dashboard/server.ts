@@ -45,7 +45,9 @@ api.get("/chargers/:cpId", (c) => {
     cpId,
     config: charger.config,
     connected: charger.connected,
-    connectors: charger.connectors,
+    connectors: charger.connectors.map((conn) =>
+      chargerManager.serializeConnector(cpId, conn)
+    ),
   });
 });
 
@@ -182,6 +184,62 @@ api.post("/chargers/:cpId/connectors/:connectorId/reset-energy", async (c) => {
   }
   return c.json({ error: "Failed to reset energy" }, 400);
 });
+
+// Get all car profiles
+api.get("/car-profiles", (c) => {
+  return c.json(chargerManager.getCarProfiles());
+});
+
+// Plug in a car to a connector
+api.post(
+  "/chargers/:cpId/connectors/:connectorId/plug-car",
+  async (c) => {
+    const cpId = c.req.param("cpId");
+    const connectorId = parseInt(c.req.param("connectorId"), 10);
+    const body = await c.req.json();
+
+    const profileId = body.profileId;
+    const initialSoc = body.initialSoc !== undefined ? body.initialSoc : 0.2;
+
+    if (!profileId) {
+      return c.json({ error: "profileId is required" }, 400);
+    }
+
+    if (chargerManager.plugInCar(cpId, connectorId, profileId, initialSoc)) {
+      return c.json({ success: true });
+    }
+    return c.json({ error: "Failed to plug in car" }, 400);
+  }
+);
+
+// Unplug a car from a connector
+api.post(
+  "/chargers/:cpId/connectors/:connectorId/unplug-car",
+  async (c) => {
+    const cpId = c.req.param("cpId");
+    const connectorId = parseInt(c.req.param("connectorId"), 10);
+
+    if (chargerManager.unplugCar(cpId, connectorId)) {
+      return c.json({ success: true });
+    }
+    return c.json({ error: "Failed to unplug car" }, 400);
+  }
+);
+
+// Get car status for a connector
+api.get(
+  "/chargers/:cpId/connectors/:connectorId/car-status",
+  (c) => {
+    const cpId = c.req.param("cpId");
+    const connectorId = parseInt(c.req.param("connectorId"), 10);
+
+    const status = chargerManager.getCarStatus(cpId, connectorId);
+    if (status === undefined) {
+      return c.json({ error: "Connector not found" }, 404);
+    }
+    return c.json(status);
+  }
+);
 
 // Bulk set connector status
 api.post("/bulk/status", async (c) => {

@@ -7,6 +7,7 @@ import { call } from "../src/messageFactory";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { CarSimulator, CAR_PROFILES, type CarProfile } from "./carSimulator";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,10 +29,11 @@ export interface ConnectorState {
   connectorId: number;
   status: string;
   errorCode: string;
-  currentImport: number; // Amps - for charging simulation
+  currentImport: number; // Amps - offered current (EVSE side)
   powerImport: number; // Watts
   energyImported: number; // Wh cumulative
   transactionId?: number;
+  carSimulator?: CarSimulator;
 }
 
 export interface ManagedCharger {
@@ -107,13 +109,15 @@ export class ChargerManager {
     cpId: string;
     config: ChargerConfig;
     connected: boolean;
-    connectors: ConnectorState[];
+    connectors: any[];
   }> {
     return Array.from(this.chargers.entries()).map(([cpId, charger]) => ({
       cpId,
       config: charger.config,
       connected: charger.connected,
-      connectors: charger.connectors,
+      connectors: charger.connectors.map((c) =>
+        this.serializeConnector(cpId, c)
+      ),
     }));
   }
 
@@ -293,15 +297,75 @@ export class ChargerManager {
 
       for (const connector of charger.connectors) {
         if (connector.status === "Charging" && connector.currentImport > 0) {
-          // Calculate energy increment (Wh) based on current and time
-          // Power = Voltage * Current (assuming 230V single phase)
           const voltage = 230;
-          const powerW = voltage * connector.currentImport;
-          connector.powerImport = powerW;
+          let reportCurrent: number;
+          let reportPower: number;
+          let energyIncrement: number;
+          let socPercent: number | undefined;
 
-          // Energy increment for 15 seconds in Wh
-          const energyIncrement = (powerW * 15) / 3600;
-          connector.energyImported += energyIncrement;
+          if (connector.carSimulator) {
+            // Car simulator takes over: tick the simulation
+            const sim = connector.carSimulator;
+            const result = sim.tick(15);
+            reportCurrent = result.currentA;
+            reportPower = result.powerW;
+            energyIncrement = result.energyIncrementWh;
+            connector.energyImported += energyIncrement;
+            connector.powerImport = reportPower;
+            socPercent = sim.getSocPercent();
+          } else {
+            // Manual mode: simple linear calculation
+            const powerW = voltage * connector.currentImport;
+            connector.powerImport = powerW;
+            energyIncrement = (powerW * 15) / 3600;
+            connector.energyImported += energyIncrement;
+            reportCurrent = connector.currentImport;
+            reportPower = powerW;
+          }
+
+          const sampledValue: Array<{
+            value: string;
+            measurand: string;
+            unit: string;
+            context: string;
+            location?: string;
+          }> = [
+            {
+              value: reportCurrent.toFixed(1),
+              measurand: "Current.Import",
+              unit: "A",
+              context: "Sample.Periodic",
+            },
+            {
+              value: reportPower.toFixed(0),
+              measurand: "Power.Active.Import",
+              unit: "W",
+              context: "Sample.Periodic",
+            },
+            {
+              value: connector.energyImported.toFixed(0),
+              measurand: "Energy.Active.Import.Register",
+              unit: "Wh",
+              context: "Sample.Periodic",
+            },
+            {
+              value: "230",
+              measurand: "Voltage",
+              unit: "V",
+              context: "Sample.Periodic",
+            },
+          ];
+
+          // Add SoC measurand when car simulator is active
+          if (socPercent !== undefined) {
+            sampledValue.push({
+              value: socPercent.toString(),
+              measurand: "SoC",
+              unit: "Percent",
+              context: "Sample.Periodic",
+              location: "EV",
+            });
+          }
 
           charger.vcp.send(
             meterValuesOcppMessage.request({
@@ -310,32 +374,7 @@ export class ChargerManager {
               meterValue: [
                 {
                   timestamp: new Date().toISOString(),
-                  sampledValue: [
-                    {
-                      value: connector.currentImport.toFixed(1),
-                      measurand: "Current.Import",
-                      unit: "A",
-                      context: "Sample.Periodic",
-                    },
-                    {
-                      value: connector.powerImport.toFixed(0),
-                      measurand: "Power.Active.Import",
-                      unit: "W",
-                      context: "Sample.Periodic",
-                    },
-                    {
-                      value: connector.energyImported.toFixed(0),
-                      measurand: "Energy.Active.Import.Register",
-                      unit: "Wh",
-                      context: "Sample.Periodic",
-                    },
-                    {
-                      value: "230",
-                      measurand: "Voltage",
-                      unit: "V",
-                      context: "Sample.Periodic",
-                    },
-                  ],
+                  sampledValue: sampledValue as any,
                 },
               ],
             })
@@ -401,6 +440,11 @@ export class ChargerManager {
 
     // Update power calculation
     connector.powerImport = 230 * currentAmps;
+
+    // Update car simulator's offered current if attached
+    if (connector.carSimulator) {
+      connector.carSimulator.setOfferedCurrent(currentAmps);
+    }
 
     return true;
   }
@@ -563,6 +607,122 @@ export class ChargerManager {
     }
 
     return { success, failed };
+  }
+
+  // Car simulator management
+  plugInCar(
+    cpId: string,
+    connectorId: number,
+    profileId: string,
+    initialSoc: number = 0.2
+  ): boolean {
+    const charger = this.chargers.get(cpId);
+    if (!charger) return false;
+
+    const connector = charger.connectors.find(
+      (c) => c.connectorId === connectorId
+    );
+    if (!connector) return false;
+
+    const profile = CAR_PROFILES.find((p) => p.id === profileId);
+    if (!profile) return false;
+
+    connector.carSimulator = new CarSimulator(
+      profile,
+      initialSoc,
+      connector.currentImport
+    );
+    return true;
+  }
+
+  unplugCar(cpId: string, connectorId: number): boolean {
+    const charger = this.chargers.get(cpId);
+    if (!charger) return false;
+
+    const connector = charger.connectors.find(
+      (c) => c.connectorId === connectorId
+    );
+    if (!connector) return false;
+
+    connector.carSimulator = undefined;
+    return true;
+  }
+
+  getCarStatus(
+    cpId: string,
+    connectorId: number
+  ):
+    | {
+        pluggedIn: boolean;
+        profileId?: string;
+        profileName?: string;
+        soc?: number;
+        socPercent?: number;
+        actualCurrentA?: number;
+        energyDeliveredWh?: number;
+        batteryCapacityKwh?: number;
+        phases?: number;
+      }
+    | undefined {
+    const charger = this.chargers.get(cpId);
+    if (!charger) return undefined;
+
+    const connector = charger.connectors.find(
+      (c) => c.connectorId === connectorId
+    );
+    if (!connector) return undefined;
+
+    if (!connector.carSimulator) {
+      return { pluggedIn: false };
+    }
+
+    const sim = connector.carSimulator;
+    const profile = sim.getProfile();
+    return {
+      pluggedIn: true,
+      profileId: profile.id,
+      profileName: profile.name,
+      soc: sim.getSoc(),
+      socPercent: sim.getSocPercent(),
+      actualCurrentA: sim.getActualCurrentA(),
+      energyDeliveredWh: sim.getEnergyDeliveredWh(),
+      batteryCapacityKwh: profile.batteryCapacityKwh,
+      phases: profile.phases,
+    };
+  }
+
+  getCarProfiles(): CarProfile[] {
+    return CAR_PROFILES;
+  }
+
+  serializeConnector(cpId: string, connector: ConnectorState): any {
+    const base: any = {
+      connectorId: connector.connectorId,
+      status: connector.status,
+      errorCode: connector.errorCode,
+      currentImport: connector.currentImport,
+      powerImport: connector.powerImport,
+      energyImported: connector.energyImported,
+      transactionId: connector.transactionId,
+    };
+
+    if (connector.carSimulator) {
+      const sim = connector.carSimulator;
+      const profile = sim.getProfile();
+      base.carSimulator = {
+        pluggedIn: true,
+        profileId: profile.id,
+        profileName: profile.name,
+        soc: sim.getSoc(),
+        socPercent: sim.getSocPercent(),
+        actualCurrentA: sim.getActualCurrentA(),
+        energyDeliveredWh: sim.getEnergyDeliveredWh(),
+        batteryCapacityKwh: profile.batteryCapacityKwh,
+        phases: profile.phases,
+      };
+    }
+
+    return base;
   }
 
   // Generate multiple chargers with auto-incrementing IDs

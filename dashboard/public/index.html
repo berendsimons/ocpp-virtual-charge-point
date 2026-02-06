@@ -297,6 +297,29 @@
     .action-btn:hover { background: var(--border-light); color: var(--text-primary); }
     .action-btn.primary { background: var(--accent-green-light); color: var(--accent-green-dark); }
     .action-btn.primary:hover { background: var(--accent-green); color: white; }
+
+    /* EV Simulator styles */
+    .ev-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 100px; font-size: 11px; font-weight: 700; background: var(--accent-purple-light); color: var(--accent-purple); margin-left: 6px; }
+    .soc-bar-container { width: 100%; height: 8px; background: var(--border-light); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+    .soc-bar { height: 100%; border-radius: 4px; transition: width 0.5s ease, background 0.5s ease; }
+    .soc-bar.low { background: var(--accent-red); }
+    .soc-bar.mid { background: var(--accent-orange); }
+    .soc-bar.high { background: var(--accent-green); }
+    .car-info-card { background: var(--accent-purple-light); border: 1px solid #d1c4e9; border-radius: var(--radius-sm); padding: 14px; margin-top: 12px; }
+    .car-info-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .car-info-card-name { font-weight: 700; font-size: 14px; color: var(--accent-purple); }
+    .car-info-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .car-info-stat { background: rgba(255,255,255,0.7); padding: 8px; border-radius: 6px; }
+    .car-info-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .car-info-stat-value { font-size: 15px; font-weight: 700; margin-top: 2px; }
+    .plug-car-btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 10px; margin-top: 12px; border: 2px dashed var(--border-medium); border-radius: var(--radius-sm); background: transparent; font-family: 'Satoshi', sans-serif; font-size: 13px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: all 0.15s ease; }
+    .plug-car-btn:hover { border-color: var(--accent-purple); color: var(--accent-purple); background: var(--accent-purple-light); }
+    .unplug-btn { padding: 4px 10px; border: none; border-radius: 6px; background: var(--accent-red-light); color: var(--accent-red); font-size: 11px; font-weight: 600; cursor: pointer; font-family: 'Satoshi', sans-serif; }
+    .unplug-btn:hover { background: #fee2e2; }
+    .soc-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .soc-label { font-size: 11px; color: var(--text-muted); }
+    .soc-percent { font-size: 14px; font-weight: 700; }
+    .estimate-text { font-size: 12px; color: var(--text-muted); margin-top: 12px; padding: 10px; background: var(--bg-cream); border-radius: var(--radius-sm); }
   </style>
 </head>
 <body>
@@ -542,7 +565,7 @@
         <div id="panelConnectors"></div>
       </div>
       <div class="panel-section">
-        <div class="panel-section-title">Charging Current</div>
+        <div class="panel-section-title" id="panelCurrentLabel">Charging Current</div>
         <div class="form-group">
           <div class="slider-control">
             <input type="range" class="slider" id="panelCurrentSlider" min="0" max="32" value="16" oninput="updatePanelCurrent()">
@@ -713,6 +736,32 @@
     </div>
   </div>
 
+  <!-- Plug In EV Modal -->
+  <div class="modal-overlay" id="plugCarModal">
+    <div class="modal">
+      <div class="modal-header"><h3 class="modal-title">Plug In EV</h3></div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Car Profile</label>
+          <select class="form-select" id="plugCarProfile" onchange="updatePlugCarPreview()">
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Initial State of Charge</label>
+          <div class="slider-control">
+            <input type="range" class="slider" id="plugCarSoc" min="0" max="99" value="20" oninput="updatePlugCarPreview()">
+            <span class="slider-value" id="plugCarSocValue">20%</span>
+          </div>
+        </div>
+        <div class="estimate-text" id="plugCarEstimate"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closePlugCarModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="plugInCar()">Plug In</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const API_BASE = '/api';
     let chargers = [];
@@ -754,10 +803,13 @@
     ];
 
     let models = JSON.parse(localStorage.getItem('chargerModels')) || [...defaultModels];
+    let carProfiles = [];
+    let plugCarTarget = null; // { cpId, connectorId }
 
     // Init
     document.addEventListener('DOMContentLoaded', () => {
       loadChargers();
+      loadCarProfiles();
       renderModels();
       populateModelSelects();
       refreshInterval = setInterval(loadChargers, 5000);
@@ -815,8 +867,9 @@
         const getConnectorStatus = (idx) => {
           const conn = charger.connectors.find(c => c.connectorId === idx);
           if (!conn) return '<span class="text-muted">-</span>';
-          if (!charger.connected) return `<span class="status-badge offline"><span class="status-badge-dot"></span>${conn.status}</span>`;
-          return `<span class="status-badge ${conn.status}"><span class="status-badge-dot"></span>${conn.status}</span>`;
+          const evTag = conn.carSimulator ? `<span class="ev-tag">EV ${conn.carSimulator.socPercent}%</span>` : '';
+          if (!charger.connected) return `<span class="status-badge offline"><span class="status-badge-dot"></span>${conn.status}</span>${evTag}`;
+          return `<span class="status-badge ${conn.status}"><span class="status-badge-dot"></span>${conn.status}</span>${evTag}`;
         };
         return `<tr><td class="checkbox-cell" onclick="event.stopPropagation();"><input type="checkbox" ${selectedChargers.has(charger.cpId) ? 'checked' : ''} onchange="toggleSelection('${charger.cpId}')"></td><td class="charger-id-cell" onclick="openChargerPanel('${charger.cpId}')">${charger.cpId}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(0)}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(1)}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(2)}</td><td onclick="openChargerPanel('${charger.cpId}')">${charger.config.vendor}</td><td onclick="openChargerPanel('${charger.cpId}')">${charger.config.model}</td><td onclick="openChargerPanel('${charger.cpId}')">${charger.config.maxCurrent || 32} A</td></tr>`;
       }).join('');
@@ -922,7 +975,42 @@
       document.getElementById('panelSerial').textContent = currentCharger.config.serialNumber || cpId;
       document.getElementById('panelFirmware').textContent = currentCharger.config.firmwareVersion || '1.0.0';
       document.getElementById('panelMaxCurrent').textContent = (currentCharger.config.maxCurrent || 32) + ' A';
-      document.getElementById('panelConnectors').innerHTML = currentCharger.connectors.map(conn => `<div class="connector-card"><div class="connector-card-header"><span class="connector-card-title">Connector ${conn.connectorId}</span><span class="status-badge ${conn.status}"><span class="status-badge-dot"></span>${conn.status}</span></div><div class="connector-card-grid"><div class="connector-stat"><div class="connector-stat-label">Current</div><div class="connector-stat-value">${conn.currentImport || 0} A</div></div><div class="connector-stat"><div class="connector-stat-label">Power</div><div class="connector-stat-value">${((conn.powerImport || 0) / 1000).toFixed(1)} kW</div></div><div class="connector-stat"><div class="connector-stat-label">Energy</div><div class="connector-stat-value">${((conn.energyImport || 0) / 1000).toFixed(2)} kWh</div></div><div class="connector-stat"><div class="connector-stat-label">Transaction</div><div class="connector-stat-value">${conn.transactionId || '-'}</div></div></div></div>`).join('');
+      const hasAnyCar = currentCharger.connectors.some(c => c.carSimulator);
+      document.getElementById('panelConnectors').innerHTML = currentCharger.connectors.map(conn => {
+        const sim = conn.carSimulator;
+        let carSection = '';
+        if (sim) {
+          const socClass = getSocBarClass(sim.socPercent);
+          const displayCurrent = sim.actualCurrentA !== undefined ? sim.actualCurrentA.toFixed(1) : '0.0';
+          const displayEnergy = ((sim.energyDeliveredWh || 0) / 1000).toFixed(2);
+          carSection = `
+            <div class="car-info-card">
+              <div class="car-info-card-header">
+                <span class="car-info-card-name">${sim.profileName}</span>
+                <button class="unplug-btn" onclick="event.stopPropagation(); unplugCar('${currentCharger.cpId}', ${conn.connectorId})">Unplug</button>
+              </div>
+              <div class="soc-label-row">
+                <span class="soc-label">State of Charge</span>
+                <span class="soc-percent">${sim.socPercent}%</span>
+              </div>
+              <div class="soc-bar-container"><div class="soc-bar ${socClass}" style="width: ${sim.socPercent}%"></div></div>
+              <div class="car-info-card-grid" style="margin-top: 10px;">
+                <div class="car-info-stat"><div class="car-info-stat-label">Actual Draw</div><div class="car-info-stat-value">${displayCurrent} A</div></div>
+                <div class="car-info-stat"><div class="car-info-stat-label">EV Energy</div><div class="car-info-stat-value">${displayEnergy} kWh</div></div>
+                <div class="car-info-stat"><div class="car-info-stat-label">Battery</div><div class="car-info-stat-value">${sim.batteryCapacityKwh} kWh</div></div>
+                <div class="car-info-stat"><div class="car-info-stat-label">Phases</div><div class="car-info-stat-value">${sim.phases}ph</div></div>
+              </div>
+            </div>`;
+        } else {
+          carSection = `<button class="plug-car-btn" onclick="event.stopPropagation(); showPlugCarModal('${currentCharger.cpId}', ${conn.connectorId})">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            Plug In EV
+          </button>`;
+        }
+        return `<div class="connector-card"><div class="connector-card-header"><span class="connector-card-title">Connector ${conn.connectorId}</span><span class="status-badge ${conn.status}"><span class="status-badge-dot"></span>${conn.status}</span></div><div class="connector-card-grid"><div class="connector-stat"><div class="connector-stat-label">${sim ? 'Offered Current' : 'Current'}</div><div class="connector-stat-value">${conn.currentImport || 0} A</div></div><div class="connector-stat"><div class="connector-stat-label">Power</div><div class="connector-stat-value">${((conn.powerImport || 0) / 1000).toFixed(1)} kW</div></div><div class="connector-stat"><div class="connector-stat-label">Energy</div><div class="connector-stat-value">${((conn.energyImported || 0) / 1000).toFixed(2)} kWh</div></div><div class="connector-stat"><div class="connector-stat-label">Transaction</div><div class="connector-stat-value">${conn.transactionId || '-'}</div></div></div>${carSection}</div>`;
+      }).join('');
+      // Relabel current slider when a car is plugged in
+      document.getElementById('panelCurrentLabel').textContent = hasAnyCar ? 'EVSE Offered Current' : 'Charging Current';
       document.getElementById('panelOverlay').classList.add('show');
       document.getElementById('chargerPanel').classList.add('show');
     }
@@ -1158,6 +1246,82 @@
     // Settings
     async function saveWsUrl() { await api('/settings/ws-url', { method: 'POST', body: JSON.stringify({ wsUrl: document.getElementById('wsUrlInput').value }) }); showToast('WebSocket URL saved', 'success'); }
     async function connectAll() { showToast('Connecting all chargers...', 'success'); await api('/chargers/connect-all', { method: 'POST' }); loadChargers(); }
+
+    // Car Simulator
+    async function loadCarProfiles() {
+      try {
+        carProfiles = await api('/car-profiles');
+        const select = document.getElementById('plugCarProfile');
+        select.innerHTML = carProfiles.map(p => `<option value="${p.id}">${p.name} (${p.batteryCapacityKwh} kWh, ${p.onboardChargerKw} kW, ${p.phases}ph)</option>`).join('');
+        updatePlugCarPreview();
+      } catch (err) { console.error('Failed to load car profiles:', err); }
+    }
+
+    function showPlugCarModal(cpId, connectorId) {
+      plugCarTarget = { cpId, connectorId };
+      document.getElementById('plugCarSoc').value = 20;
+      document.getElementById('plugCarSocValue').textContent = '20%';
+      updatePlugCarPreview();
+      document.getElementById('plugCarModal').classList.add('show');
+    }
+    function closePlugCarModal() { document.getElementById('plugCarModal').classList.remove('show'); plugCarTarget = null; }
+
+    function updatePlugCarPreview() {
+      document.getElementById('plugCarSocValue').textContent = document.getElementById('plugCarSoc').value + '%';
+      const profileId = document.getElementById('plugCarProfile').value;
+      const soc = parseInt(document.getElementById('plugCarSoc').value) / 100;
+      const profile = carProfiles.find(p => p.id === profileId);
+      if (profile) {
+        const remainingKwh = profile.batteryCapacityKwh * (1 - soc);
+        const chargePowerKw = profile.onboardChargerKw;
+        const hoursEstimate = remainingKwh / chargePowerKw;
+        const hours = Math.floor(hoursEstimate);
+        const minutes = Math.round((hoursEstimate - hours) * 60);
+        document.getElementById('plugCarEstimate').innerHTML =
+          `<strong>${profile.name}</strong>: ${remainingKwh.toFixed(1)} kWh to charge (${profile.batteryCapacityKwh} kWh battery)<br>` +
+          `Estimated time at ${chargePowerKw} kW: ~${hours}h ${minutes}m<br>` +
+          `<span style="font-size:11px; color:var(--text-muted);">${profile.phases}-phase, taper starts at ${Math.round(profile.taperStartSoc * 100)}% SoC (${profile.taperCurve})</span>`;
+      }
+    }
+
+    async function plugInCar() {
+      if (!plugCarTarget) return;
+      const profileId = document.getElementById('plugCarProfile').value;
+      const initialSoc = parseInt(document.getElementById('plugCarSoc').value) / 100;
+      const result = await api(`/chargers/${plugCarTarget.cpId}/connectors/${plugCarTarget.connectorId}/plug-car`, {
+        method: 'POST',
+        body: JSON.stringify({ profileId, initialSoc })
+      });
+      if (result.success) {
+        closePlugCarModal();
+        showToast('EV plugged in', 'success');
+        loadChargers();
+        if (currentCharger && currentCharger.cpId === plugCarTarget.cpId) {
+          setTimeout(() => openChargerPanel(plugCarTarget.cpId), 300);
+        }
+      } else {
+        showToast(result.error || 'Failed to plug in car', 'error');
+      }
+    }
+
+    async function unplugCar(cpId, connectorId) {
+      const result = await api(`/chargers/${cpId}/connectors/${connectorId}/unplug-car`, { method: 'POST' });
+      if (result.success) {
+        showToast('EV unplugged', 'success');
+        loadChargers();
+        if (currentCharger && currentCharger.cpId === cpId) {
+          setTimeout(() => openChargerPanel(cpId), 300);
+        }
+      } else {
+        showToast(result.error || 'Failed to unplug car', 'error');
+      }
+    }
+
+    function getSocBarClass(percent) {
+      if (percent < 25) return 'low';
+      if (percent < 70) return 'mid';
+      return 'high';
+    }
 
     // Toast
     function showToast(message, type = 'success') { const existing = document.querySelector('.toast'); if (existing) existing.remove(); const toast = document.createElement('div'); toast.className = `toast ${type}`; const icon = type === 'success' ? '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>' : '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>'; toast.innerHTML = icon + message; document.body.appendChild(toast); setTimeout(() => toast.remove(), 3000); }
