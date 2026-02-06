@@ -19,6 +19,18 @@
       "connectors": 2,
       "cpId": "VCP--001",
       "serialNumber": "VCP--001"
+    },
+    {
+      "cpId": "T1845738590048--D",
+      "vendor": "ABB",
+      "model": "MD_TERRA_D",
+      "serialNumber": "T1845738590048--D",
+      "firmwareVersion": "4.0.4.22",
+      "connectors": 2,
+      "meterType": "MID",
+      "meterSerialNumber": "E6Z474257",
+      "iccid": "8973006824541344853",
+      "imsi": "204217400962281"
     }
   ]
 }
