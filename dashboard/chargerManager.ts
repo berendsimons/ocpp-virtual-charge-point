@@ -313,6 +313,21 @@ export class ChargerManager {
             connector.energyImported += energyIncrement;
             connector.powerImport = reportPower;
             socPercent = sim.getSocPercent();
+
+            // SuspendedEV override: when car reaches 100% SoC, transition to SuspendedEV
+            if (socPercent >= 100 && result.currentA === 0) {
+              connector.status = "SuspendedEV";
+              connector.powerImport = 0;
+              if (charger.vcp && charger.connected) {
+                charger.vcp.send(
+                  statusNotificationOcppMessage.request({
+                    connectorId: connector.connectorId,
+                    errorCode: connector.errorCode as any,
+                    status: "SuspendedEV" as any,
+                  })
+                );
+              }
+            }
           } else {
             // Manual mode: simple linear calculation
             const powerW = voltage * connector.currentImport;

@@ -1250,17 +1250,21 @@
     // Car Simulator
     async function loadCarProfiles() {
       try {
-        carProfiles = await api('/car-profiles');
+        const data = await api('/car-profiles');
+        if (!Array.isArray(data)) { console.error('Car profiles response is not an array:', data); return; }
+        carProfiles = data;
         const select = document.getElementById('plugCarProfile');
         select.innerHTML = carProfiles.map(p => `<option value="${p.id}">${p.name} (${p.batteryCapacityKwh} kWh, ${p.onboardChargerKw} kW, ${p.phases}ph)</option>`).join('');
         updatePlugCarPreview();
       } catch (err) { console.error('Failed to load car profiles:', err); }
     }
 
-    function showPlugCarModal(cpId, connectorId) {
+    async function showPlugCarModal(cpId, connectorId) {
       plugCarTarget = { cpId, connectorId };
       document.getElementById('plugCarSoc').value = 20;
       document.getElementById('plugCarSocValue').textContent = '20%';
+      // Always reload profiles when opening modal to ensure dropdown is populated
+      if (carProfiles.length === 0) await loadCarProfiles();
       updatePlugCarPreview();
       document.getElementById('plugCarModal').classList.add('show');
     }
