@@ -1,0 +1,24 @@
+{
+  "chargers": [
+    {
+      "cpId": "T1845123031855--D",
+      "vendor": "ABB",
+      "model": "MD_TERRA_D",
+      "serialNumber": "T1845123031855--D",
+      "firmwareVersion": "4.0.4.22",
+      "connectors": 2,
+      "meterType": "MID",
+      "iccid": "8986647319048838343",
+      "imsi": "204869678867348",
+      "meterSerialNumber": "D6J567015"
+    },
+    {
+      "vendor": "VirtualCharger",
+      "model": "VCP-1",
+      "firmwareVersion": "1.0.0",
+      "connectors": 2,
+      "cpId": "VCP--001",
+      "serialNumber": "VCP--001"
+    }
+  ]
+}

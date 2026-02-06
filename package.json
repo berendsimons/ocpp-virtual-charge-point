@@ -10,7 +10,8 @@
     "format": "biome format src",
     "format:check": "biome ci --linter-enabled=false --organize-imports-enabled=false src",
     "typecheck": "tsc --noEmit --esModuleInterop --skipLibCheck src/**/*.ts",
-    "check": "npm run lint && npm run format:check && npm run typecheck"
+    "check": "npm run lint && npm run format:check && npm run typecheck",
+    "dashboard": "tsx dashboard/server.ts"
   },
   "author": "Solidstudio",
   "license": "Apache-2.0",
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
+    "@types/node": "^20.0.0",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.18.0",
     "tsx": "^4.19.3"

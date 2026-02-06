@@ -51,6 +51,8 @@ interface VCPOptions {
   basicAuthPassword?: string;
   adminPort?: number;
   config?: ChargePointConfig;
+  exitOnClose?: boolean; // If false, don't exit process on connection close
+  onClose?: (code: number, reason: string) => void; // Callback for connection close
 }
 
 export type { ChargePointConfig };
@@ -201,7 +203,9 @@ export class VCP {
     this.isFinishing = true;
     this.ws.close();
     this.ws = undefined;
-    process.exit(1);
+    if (this.vcpOptions.exitOnClose !== false) {
+      process.exit(1);
+    }
   }
 
   async getDiagnosticData(): Promise<LogEntry[]> {
@@ -291,6 +295,15 @@ export class VCP {
       return;
     }
     logger.info(`Connection closed. code=${code}, reason=${reason}`);
-    process.exit();
+
+    // Call the onClose callback if provided
+    if (this.vcpOptions.onClose) {
+      this.vcpOptions.onClose(code, typeof reason === 'string' ? reason : String(reason));
+    }
+
+    // Only exit if exitOnClose is not explicitly set to false
+    if (this.vcpOptions.exitOnClose !== false) {
+      process.exit();
+    }
   }
 }
