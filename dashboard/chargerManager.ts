@@ -152,6 +152,12 @@ export class ChargerManager {
     const charger = this.chargers.get(cpId);
     if (!charger || charger.connected) return false;
 
+    // Validate WebSocket URL
+    if (!this.wsUrl || !this.wsUrl.startsWith("ws://") && !this.wsUrl.startsWith("wss://")) {
+      console.error(`[FAILED] ${cpId}: Invalid WebSocket URL: ${this.wsUrl}`);
+      return false;
+    }
+
     try {
       const vcp = new VCP({
         endpoint: this.wsUrl,
@@ -160,6 +166,15 @@ export class ChargerManager {
         exitOnClose: false, // Don't exit the dashboard process on disconnect
         onClose: (code, reason) => {
           console.log(`[DISCONNECTED] ${cpId}: code=${code}, reason=${reason}`);
+          const ch = this.chargers.get(cpId);
+          if (ch) {
+            ch.connected = false;
+            ch.vcp = null;
+            this.stopMeterValues(cpId);
+          }
+        },
+        onError: (err) => {
+          console.error(`[ERROR] ${cpId}: ${err.message}`);
           const ch = this.chargers.get(cpId);
           if (ch) {
             ch.connected = false;
@@ -244,6 +259,28 @@ export class ChargerManager {
     }
 
     return { success, failed };
+  }
+
+  disconnectCharger(cpId: string): boolean {
+    const charger = this.chargers.get(cpId);
+    if (!charger || !charger.connected) return false;
+
+    try {
+      this.stopMeterValues(cpId);
+
+      if (charger.vcp) {
+        charger.vcp.close();
+      }
+
+      charger.connected = false;
+      charger.vcp = null;
+
+      console.log(`[DISCONNECTED] ${cpId}`);
+      return true;
+    } catch (err) {
+      console.error(`[DISCONNECT FAILED] ${cpId}:`, err);
+      return false;
+    }
   }
 
   private startMeterValues(cpId: string) {

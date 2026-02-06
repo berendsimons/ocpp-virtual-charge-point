@@ -119,6 +119,16 @@ api.post("/chargers/connect-all", async (c) => {
   return c.json({ success: true, ...result });
 });
 
+// Disconnect a charger
+api.post("/chargers/:cpId/disconnect", async (c) => {
+  const cpId = c.req.param("cpId");
+  const result = chargerManager.disconnectCharger(cpId);
+  if (result) {
+    return c.json({ success: true });
+  }
+  return c.json({ error: "Failed to disconnect" }, 500);
+});
+
 // Set connector status
 api.post("/chargers/:cpId/connectors/:connectorId/status", async (c) => {
   const cpId = c.req.param("cpId");

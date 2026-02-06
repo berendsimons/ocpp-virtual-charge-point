@@ -53,6 +53,7 @@ interface VCPOptions {
   config?: ChargePointConfig;
   exitOnClose?: boolean; // If false, don't exit process on connection close
   onClose?: (code: number, reason: string) => void; // Callback for connection close
+  onError?: (error: Error) => void; // Callback for connection errors
 }
 
 export type { ChargePointConfig };
@@ -107,7 +108,7 @@ export class VCP {
   async connect(): Promise<void> {
     logger.info(`Connecting... | ${util.inspect(this.vcpOptions)}`);
     this.isFinishing = false;
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const websocketUrl = `${this.vcpOptions.endpoint}/${this.vcpOptions.chargePointId}`;
       const protocol = toProtocolVersion(this.vcpOptions.ocppVersion);
       this.ws = new WebSocket(websocketUrl, [protocol], {
@@ -133,6 +134,13 @@ export class VCP {
       this.ws.on("close", (code: number, reason: string) =>
         this._onClose(code, reason),
       );
+      this.ws.on("error", (err: Error) => {
+        logger.error(`WebSocket error: ${err.message}`);
+        if (this.vcpOptions.onError) {
+          this.vcpOptions.onError(err);
+        }
+        reject(err);
+      });
     });
   }
 
