@@ -201,6 +201,9 @@ export class ChargerManager {
 
       charger.vcp = vcp;
 
+      // Brief delay to let CSMS/proxy finish connection setup before sending
+      await new Promise((r) => setTimeout(r, 500));
+
       // Send BootNotification (await to ensure it's actually sent)
       console.log(`[BOOT] ${cpId}: Sending BootNotification...`);
       await vcp.sendAsync(
@@ -650,6 +653,10 @@ export class ChargerManager {
       initialSoc,
       connector.currentImport
     );
+
+    // Transition to Preparing (cable plugged in)
+    this.setConnectorStatus(cpId, connectorId, "Preparing");
+
     return true;
   }
 
@@ -663,6 +670,10 @@ export class ChargerManager {
     if (!connector) return false;
 
     connector.carSimulator = undefined;
+
+    // Transition back to Available (cable unplugged)
+    this.setConnectorStatus(cpId, connectorId, "Available");
+
     return true;
   }
 
