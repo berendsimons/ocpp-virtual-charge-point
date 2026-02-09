@@ -166,6 +166,37 @@ export class VCP {
   }
 
   // biome-ignore lint/suspicious/noExplicitAny: ocpp types
+  sendAsync(ocppCall: OcppCall<any>): Promise<void> {
+    if (!this.ws) {
+      return Promise.reject(
+        new Error("Websocket not initialized. Call connect() first"),
+      );
+    }
+    ocppOutbox.enqueue(ocppCall);
+    const jsonMessage = JSON.stringify([
+      2,
+      ocppCall.messageId,
+      ocppCall.action,
+      ocppCall.payload,
+    ]);
+    logger.info(`Sending message ➡️  ${jsonMessage}`);
+    validateOcppOutgoingRequest(
+      this.vcpOptions.ocppVersion,
+      ocppCall.action,
+      JSON.parse(JSON.stringify(ocppCall.payload)),
+    );
+    return new Promise((resolve, reject) => {
+      this.ws!.send(jsonMessage, (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  // biome-ignore lint/suspicious/noExplicitAny: ocpp types
   respond(result: OcppCallResult<any>) {
     if (!this.ws) {
       throw new Error("Websocket not initialized. Call connect() first");

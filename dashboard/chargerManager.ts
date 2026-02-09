@@ -200,10 +200,10 @@ export class ChargerManager {
       await vcp.connect();
 
       charger.vcp = vcp;
-      charger.connected = true;
 
-      // Send BootNotification
-      vcp.send(
+      // Send BootNotification (await to ensure it's actually sent)
+      console.log(`[BOOT] ${cpId}: Sending BootNotification...`);
+      await vcp.sendAsync(
         bootNotificationOcppMessage.request({
           chargePointVendor: charger.config.vendor,
           chargePointModel: charger.config.model,
@@ -215,6 +215,9 @@ export class ChargerManager {
           meterSerialNumber: charger.config.meterSerialNumber,
         })
       );
+      console.log(`[BOOT] ${cpId}: BootNotification sent`);
+
+      charger.connected = true;
 
       // Send StatusNotification for connector 0 (charge point itself)
       vcp.send(
