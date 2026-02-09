@@ -43,6 +43,18 @@
       "meterSerialNumber": "G6D969388",
       "iccid": "8949954294113163717",
       "imsi": "204393636977194"
+    },
+    {
+      "cpId": "LIB-3049581--D",
+      "vendor": "Alfen",
+      "model": "NG920-61001",
+      "serialNumber": "LIB-3049581--D",
+      "firmwareVersion": "7.2.9-4297",
+      "connectors": 1,
+      "meterType": "MID",
+      "meterSerialNumber": "N6W047139",
+      "iccid": "8972954173841338626",
+      "imsi": "204955642123046"
     }
   ]
 }
