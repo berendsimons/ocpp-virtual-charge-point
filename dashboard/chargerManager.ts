@@ -349,6 +349,23 @@ export class ChargerManager {
           const voltageL2 = 230 + (Math.random() * 4 - 2);
           const voltageL3 = 230 + (Math.random() * 4 - 2);
 
+          // Simulate temperatures with small jitter
+          const bodyTemp = 20 + (Math.random() * 2 - 1); // ~19-21°C
+          const cableTemp = 19 + (Math.random() * 2 - 1); // ~18-20°C
+
+          // Determine per-phase current distribution
+          const phases = connector.carSimulator?.getProfile()?.phases ?? 1;
+          let currentL1: number, currentL2: number, currentL3: number;
+          if (phases === 3) {
+            currentL1 = reportCurrent;
+            currentL2 = reportCurrent;
+            currentL3 = reportCurrent;
+          } else {
+            currentL1 = reportCurrent;
+            currentL2 = 0;
+            currentL3 = 0;
+          }
+
           const sampledValue: Array<{
             value: string;
             measurand: string;
@@ -358,44 +375,87 @@ export class ChargerManager {
             location?: string;
           }> = [
             {
-              value: connector.energyImported.toFixed(0),
+              value: (connector.energyImported / 1000).toFixed(3),
               measurand: "Energy.Active.Import.Register",
-              unit: "Wh",
+              unit: "kWh",
               context: "Sample.Periodic",
+              location: "Outlet",
             },
             {
-              value: reportPower.toFixed(0),
-              measurand: "Power.Active.Import",
-              unit: "W",
-              context: "Sample.Periodic",
-            },
-            {
-              value: reportCurrent.toFixed(1),
-              measurand: "Current.Import",
+              value: connector.currentImport.toFixed(2),
+              measurand: "Current.Offered",
               unit: "A",
               context: "Sample.Periodic",
+              location: "Outlet",
+            },
+            {
+              value: bodyTemp.toFixed(2),
+              measurand: "Temperature",
+              unit: "Celsius",
+              context: "Sample.Periodic",
+              location: "Body",
+            },
+            {
+              value: cableTemp.toFixed(2),
+              measurand: "Temperature",
+              unit: "Celsius",
+              context: "Sample.Periodic",
+              location: "Cable",
+            },
+            {
+              value: voltageL1.toFixed(2),
+              measurand: "Voltage",
+              unit: "V",
+              context: "Sample.Periodic",
+              location: "Outlet",
               phase: "L1",
             },
             {
-              value: voltageL1.toFixed(1),
+              value: voltageL2.toFixed(2),
               measurand: "Voltage",
               unit: "V",
               context: "Sample.Periodic",
-              phase: "L1-N",
+              location: "Outlet",
+              phase: "L2",
             },
             {
-              value: voltageL2.toFixed(1),
+              value: voltageL3.toFixed(2),
               measurand: "Voltage",
               unit: "V",
               context: "Sample.Periodic",
-              phase: "L2-N",
+              location: "Outlet",
+              phase: "L3",
             },
             {
-              value: voltageL3.toFixed(1),
-              measurand: "Voltage",
-              unit: "V",
+              value: currentL1.toFixed(2),
+              measurand: "Current.Import",
+              unit: "A",
               context: "Sample.Periodic",
-              phase: "L3-N",
+              location: "Outlet",
+              phase: "L1",
+            },
+            {
+              value: currentL2.toFixed(2),
+              measurand: "Current.Import",
+              unit: "A",
+              context: "Sample.Periodic",
+              location: "Outlet",
+              phase: "L2",
+            },
+            {
+              value: currentL3.toFixed(2),
+              measurand: "Current.Import",
+              unit: "A",
+              context: "Sample.Periodic",
+              location: "Outlet",
+              phase: "L3",
+            },
+            {
+              value: reportPower.toFixed(2),
+              measurand: "Power.Active.Import",
+              unit: "W",
+              context: "Sample.Periodic",
+              location: "Outlet",
             },
           ];
 
