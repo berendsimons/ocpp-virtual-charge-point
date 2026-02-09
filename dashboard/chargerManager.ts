@@ -344,17 +344,23 @@ export class ChargerManager {
             reportPower = powerW;
           }
 
+          // Simulate realistic voltage with small jitter per phase
+          const voltageL1 = 230 + (Math.random() * 4 - 2); // ~228-232V
+          const voltageL2 = 230 + (Math.random() * 4 - 2);
+          const voltageL3 = 230 + (Math.random() * 4 - 2);
+
           const sampledValue: Array<{
             value: string;
             measurand: string;
             unit: string;
             context: string;
+            phase?: string;
             location?: string;
           }> = [
             {
-              value: reportCurrent.toFixed(1),
-              measurand: "Current.Import",
-              unit: "A",
+              value: connector.energyImported.toFixed(0),
+              measurand: "Energy.Active.Import.Register",
+              unit: "Wh",
               context: "Sample.Periodic",
             },
             {
@@ -364,16 +370,32 @@ export class ChargerManager {
               context: "Sample.Periodic",
             },
             {
-              value: connector.energyImported.toFixed(0),
-              measurand: "Energy.Active.Import.Register",
-              unit: "Wh",
+              value: reportCurrent.toFixed(1),
+              measurand: "Current.Import",
+              unit: "A",
               context: "Sample.Periodic",
+              phase: "L1",
             },
             {
-              value: "230",
+              value: voltageL1.toFixed(1),
               measurand: "Voltage",
               unit: "V",
               context: "Sample.Periodic",
+              phase: "L1-N",
+            },
+            {
+              value: voltageL2.toFixed(1),
+              measurand: "Voltage",
+              unit: "V",
+              context: "Sample.Periodic",
+              phase: "L2-N",
+            },
+            {
+              value: voltageL3.toFixed(1),
+              measurand: "Voltage",
+              unit: "V",
+              context: "Sample.Periodic",
+              phase: "L3-N",
             },
           ];
 
