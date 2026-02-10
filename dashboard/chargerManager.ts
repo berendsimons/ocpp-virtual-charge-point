@@ -347,18 +347,10 @@ export class ChargerManager {
             reportPower = powerW;
           }
 
-          // Simulate realistic voltage with small jitter per phase
-          const voltageL1 = 230 + (Math.random() * 4 - 2); // ~228-232V
-          const voltageL2 = 230 + (Math.random() * 4 - 2);
-          const voltageL3 = 230 + (Math.random() * 4 - 2);
-
-          // Simulate temperatures with small jitter
-          const bodyTemp = 20 + (Math.random() * 2 - 1); // ~19-21°C
-          const cableTemp = 19 + (Math.random() * 2 - 1); // ~18-20°C
-
           // Determine per-phase current distribution using effective phases
           // (min of charger installation phases and car's phases)
           const effectivePhases = connector.carSimulator?.getEffectivePhases() ?? 1;
+          const chargerPhases = charger.config.phases || 3;
           let currentL1: number, currentL2: number, currentL3: number;
           if (effectivePhases === 3) {
             currentL1 = reportCurrent;
@@ -373,6 +365,19 @@ export class ChargerManager {
             currentL2 = 0;
             currentL3 = 0;
           }
+
+          // Voltage model: sags under load, rises when idle
+          // No-load voltage sits slightly above 230V nominal (~232V)
+          // Each amp of draw causes ~0.15V drop (typical residential impedance)
+          const noLoadV = 232;
+          const dropPerAmp = 0.15;
+          const voltageL1 = noLoadV - (currentL1 * dropPerAmp) + (Math.random() * 2 - 1);
+          const voltageL2 = noLoadV - (currentL2 * dropPerAmp) + (Math.random() * 2 - 1);
+          const voltageL3 = noLoadV - (currentL3 * dropPerAmp) + (Math.random() * 2 - 1);
+
+          // Simulate temperatures with small jitter
+          const bodyTemp = 20 + (Math.random() * 2 - 1); // ~19-21°C
+          const cableTemp = 19 + (Math.random() * 2 - 1); // ~18-20°C
 
           const sampledValue: Array<{
             value: string;
@@ -410,6 +415,7 @@ export class ChargerManager {
               context: "Sample.Periodic",
               location: "Cable",
             },
+            // L1 always present
             {
               value: voltageL1.toFixed(2),
               measurand: "Voltage",
@@ -419,22 +425,6 @@ export class ChargerManager {
               phase: "L1",
             },
             {
-              value: voltageL2.toFixed(2),
-              measurand: "Voltage",
-              unit: "V",
-              context: "Sample.Periodic",
-              location: "Outlet",
-              phase: "L2",
-            },
-            {
-              value: voltageL3.toFixed(2),
-              measurand: "Voltage",
-              unit: "V",
-              context: "Sample.Periodic",
-              location: "Outlet",
-              phase: "L3",
-            },
-            {
               value: currentL1.toFixed(2),
               measurand: "Current.Import",
               unit: "A",
@@ -442,30 +432,53 @@ export class ChargerManager {
               location: "Outlet",
               phase: "L1",
             },
-            {
-              value: currentL2.toFixed(2),
-              measurand: "Current.Import",
-              unit: "A",
-              context: "Sample.Periodic",
-              location: "Outlet",
-              phase: "L2",
-            },
-            {
-              value: currentL3.toFixed(2),
-              measurand: "Current.Import",
-              unit: "A",
-              context: "Sample.Periodic",
-              location: "Outlet",
-              phase: "L3",
-            },
-            {
-              value: reportPower.toFixed(2),
-              measurand: "Power.Active.Import",
-              unit: "W",
-              context: "Sample.Periodic",
-              location: "Outlet",
-            },
           ];
+
+          // L2/L3 only reported on 3-phase charger installations
+          if (chargerPhases === 3) {
+            sampledValue.push(
+              {
+                value: voltageL2.toFixed(2),
+                measurand: "Voltage",
+                unit: "V",
+                context: "Sample.Periodic",
+                location: "Outlet",
+                phase: "L2",
+              },
+              {
+                value: currentL2.toFixed(2),
+                measurand: "Current.Import",
+                unit: "A",
+                context: "Sample.Periodic",
+                location: "Outlet",
+                phase: "L2",
+              },
+              {
+                value: voltageL3.toFixed(2),
+                measurand: "Voltage",
+                unit: "V",
+                context: "Sample.Periodic",
+                location: "Outlet",
+                phase: "L3",
+              },
+              {
+                value: currentL3.toFixed(2),
+                measurand: "Current.Import",
+                unit: "A",
+                context: "Sample.Periodic",
+                location: "Outlet",
+                phase: "L3",
+              }
+            );
+          }
+
+          sampledValue.push({
+            value: reportPower.toFixed(2),
+            measurand: "Power.Active.Import",
+            unit: "W",
+            context: "Sample.Periodic",
+            location: "Outlet",
+          });
 
           // Add SoC measurand when car simulator is active
           if (socPercent !== undefined) {
