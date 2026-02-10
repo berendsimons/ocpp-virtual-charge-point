@@ -937,8 +937,8 @@
       if (selectedChargers.size === 0) { showToast('Please select at least one charger', 'error'); return; }
       switch (action) {
         case 'hardReset': if (confirm(`Hard reset ${selectedChargers.size} charger(s)?`)) { showToast(`Hard reset sent to ${selectedChargers.size} charger(s)`, 'success'); } break;
-        case 'startTransaction': showToast(`Start transaction sent to ${selectedChargers.size} charger(s)`, 'success'); break;
-        case 'stopTransaction': showToast(`Stop transaction sent to ${selectedChargers.size} charger(s)`, 'success'); break;
+        case 'startTransaction': bulkStartTransaction(); break;
+        case 'stopTransaction': bulkStopTransaction(); break;
         case 'setMaxCurrent': document.getElementById('maxCurrentCount').textContent = selectedChargers.size; document.getElementById('maxCurrentModal').classList.add('show'); break;
         case 'changeConfiguration': document.getElementById('configCount').textContent = selectedChargers.size; document.getElementById('configModal').classList.add('show'); break;
         case 'connect': bulkConnect(); break;
@@ -971,6 +971,32 @@
       selectedChargers.clear();
       updateSelectionUI();
       showToast(`Deleted chargers`, 'success');
+      loadChargers();
+    }
+
+    async function bulkStartTransaction() {
+      showToast(`Starting transactions on ${selectedChargers.size} charger(s)...`, 'success');
+      for (const cpId of selectedChargers) {
+        const ch = chargers.find(c => c.cpId === cpId);
+        if (!ch || !ch.connected) continue;
+        for (const conn of ch.connectors) {
+          await api(`/chargers/${cpId}/connectors/${conn.connectorId}/start-transaction`, { method: 'POST', body: JSON.stringify({}) });
+        }
+      }
+      loadChargers();
+    }
+
+    async function bulkStopTransaction() {
+      showToast(`Stopping transactions on ${selectedChargers.size} charger(s)...`, 'success');
+      for (const cpId of selectedChargers) {
+        const ch = chargers.find(c => c.cpId === cpId);
+        if (!ch || !ch.connected) continue;
+        for (const conn of ch.connectors) {
+          if (conn.transactionId) {
+            await api(`/chargers/${cpId}/connectors/${conn.connectorId}/stop-transaction`, { method: 'POST' });
+          }
+        }
+      }
       loadChargers();
     }
 
@@ -1039,7 +1065,32 @@
     function closeChargerPanel() { document.getElementById('panelOverlay').classList.remove('show'); document.getElementById('chargerPanel').classList.remove('show'); currentCharger = null; }
     function updatePanelCurrent() { document.getElementById('panelCurrentValue').textContent = document.getElementById('panelCurrentSlider').value + ' A'; }
     async function applyPanelCurrent() { if (!currentCharger) return; const current = document.getElementById('panelCurrentSlider').value; for (const conn of currentCharger.connectors) { await api(`/chargers/${currentCharger.cpId}/connectors/${conn.connectorId}/current`, { method: 'POST', body: JSON.stringify({ currentAmps: parseInt(current, 10) }) }); } showToast(`Current set to ${current}A`, 'success'); loadChargers(); }
-    async function chargerAction(action) { if (!currentCharger) return; switch (action) { case 'connect': await api(`/chargers/${currentCharger.cpId}/connect`, { method: 'POST' }); showToast('Connecting...', 'success'); break; default: showToast(`${action} sent`, 'success'); } loadChargers(); }
+    async function chargerAction(action) {
+      if (!currentCharger) return;
+      switch (action) {
+        case 'connect':
+          await api(`/chargers/${currentCharger.cpId}/connect`, { method: 'POST' });
+          showToast('Connecting...', 'success');
+          break;
+        case 'startTransaction':
+          for (const conn of currentCharger.connectors) {
+            await api(`/chargers/${currentCharger.cpId}/connectors/${conn.connectorId}/start-transaction`, { method: 'POST', body: JSON.stringify({}) });
+          }
+          showToast('Transaction starting...', 'success');
+          break;
+        case 'stopTransaction':
+          for (const conn of currentCharger.connectors) {
+            if (conn.transactionId) {
+              await api(`/chargers/${currentCharger.cpId}/connectors/${conn.connectorId}/stop-transaction`, { method: 'POST' });
+            }
+          }
+          showToast('Transaction stopped', 'success');
+          break;
+        default:
+          showToast(`${action} sent`, 'success');
+      }
+      loadChargers();
+    }
     async function deleteCurrentCharger() { if (!currentCharger || !confirm(`Delete charger ${currentCharger.cpId}?`)) return; await api(`/chargers/${currentCharger.cpId}`, { method: 'DELETE' }); closeChargerPanel(); showToast('Charger deleted', 'success'); loadChargers(); }
 
     // Add Charger Modal

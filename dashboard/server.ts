@@ -176,6 +176,38 @@ api.post("/chargers/:cpId/connectors/:connectorId/transaction", async (c) => {
   return c.json({ error: "Failed to set transaction" }, 400);
 });
 
+// Start transaction (Authorize + StartTransaction OCPP flow)
+api.post(
+  "/chargers/:cpId/connectors/:connectorId/start-transaction",
+  async (c) => {
+    const cpId = c.req.param("cpId");
+    const connectorId = parseInt(c.req.param("connectorId"), 10);
+    const body = await c.req.json().catch(() => ({}));
+    const idTag = body.idTag || "VIRTUAL001";
+
+    const result = await chargerManager.startTransaction(cpId, connectorId, idTag);
+    if (result) {
+      return c.json({ success: true });
+    }
+    return c.json({ error: "Failed to start transaction" }, 400);
+  }
+);
+
+// Stop transaction
+api.post(
+  "/chargers/:cpId/connectors/:connectorId/stop-transaction",
+  async (c) => {
+    const cpId = c.req.param("cpId");
+    const connectorId = parseInt(c.req.param("connectorId"), 10);
+
+    const result = await chargerManager.stopTransaction(cpId, connectorId);
+    if (result) {
+      return c.json({ success: true });
+    }
+    return c.json({ error: "Failed to stop transaction" }, 400);
+  }
+);
+
 // Reset energy counter
 api.post("/chargers/:cpId/connectors/:connectorId/reset-energy", async (c) => {
   const cpId = c.req.param("cpId");

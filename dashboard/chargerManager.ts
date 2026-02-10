@@ -2,6 +2,9 @@ import { OcppVersion } from "../src/ocppVersion";
 import { bootNotificationOcppMessage } from "../src/v16/messages/bootNotification";
 import { statusNotificationOcppMessage } from "../src/v16/messages/statusNotification";
 import { meterValuesOcppMessage } from "../src/v16/messages/meterValues";
+import { authorizeOcppMessage } from "../src/v16/messages/authorize";
+import { startTransactionOcppMessage } from "../src/v16/messages/startTransaction";
+import { stopTransactionOcppMessage } from "../src/v16/messages/stopTransaction";
 import { VCP } from "../src/vcp";
 import { call } from "../src/messageFactory";
 import * as fs from "node:fs";
@@ -749,8 +752,14 @@ export class ChargerManager {
       charger.config.phases
     );
 
-    // Transition to Preparing (cable plugged in)
-    this.setConnectorStatus(cpId, connectorId, "Preparing");
+    // If a transaction is already active (user started transaction first, then plugs in car),
+    // transition through SuspendedEV → Charging
+    if (connector.transactionId && connector.status === "Preparing") {
+      this.transitionToCharging(cpId, connectorId);
+    } else {
+      // No transaction yet — just go to Preparing (cable plugged in)
+      this.setConnectorStatus(cpId, connectorId, "Preparing");
+    }
 
     return true;
   }
@@ -766,8 +775,13 @@ export class ChargerManager {
 
     connector.carSimulator = undefined;
 
-    // Transition back to Available (cable unplugged)
-    this.setConnectorStatus(cpId, connectorId, "Available");
+    // If transaction is active, go to Preparing (cable unplugged but transaction still open)
+    // Otherwise go to Available
+    if (connector.transactionId) {
+      this.setConnectorStatus(cpId, connectorId, "Preparing");
+    } else {
+      this.setConnectorStatus(cpId, connectorId, "Available");
+    }
 
     return true;
   }
@@ -817,6 +831,135 @@ export class ChargerManager {
 
   getCarProfiles(): CarProfile[] {
     return CAR_PROFILES;
+  }
+
+  // Transaction management
+  async startTransaction(
+    cpId: string,
+    connectorId: number,
+    idTag: string = "VIRTUAL001"
+  ): Promise<boolean> {
+    const charger = this.chargers.get(cpId);
+    if (!charger?.vcp || !charger.connected) return false;
+
+    const connector = charger.connectors.find(
+      (c) => c.connectorId === connectorId
+    );
+    if (!connector) return false;
+
+    // Don't start if already in a transaction
+    if (connector.transactionId) return false;
+
+    // Send Authorize
+    charger.vcp.send(
+      authorizeOcppMessage.request({ idTag })
+    );
+
+    // Brief delay to let Authorize complete, then send StartTransaction
+    await new Promise((r) => setTimeout(r, 500));
+
+    charger.vcp.send(
+      startTransactionOcppMessage.request({
+        connectorId,
+        idTag,
+        meterStart: Math.round(connector.energyImported),
+        timestamp: new Date().toISOString(),
+      })
+    );
+
+    // Set to Preparing (waiting for EV or already has one)
+    this.setConnectorStatus(cpId, connectorId, "Preparing");
+
+    // Poll for transactionId from CSMS response (comes via VCP's resHandler → TransactionManager)
+    let attempts = 0;
+    const maxAttempts = 50; // 10 seconds max
+    const pollInterval = setInterval(() => {
+      attempts++;
+      if (attempts > maxAttempts || !charger.vcp) {
+        clearInterval(pollInterval);
+        console.log(`[TRANSACTION] ${cpId} conn ${connectorId}: timed out waiting for transactionId`);
+        return;
+      }
+      const txns = charger.vcp.transactionManager.transactions;
+      for (const [txId, tx] of txns) {
+        if (tx.connectorId === connectorId) {
+          clearInterval(pollInterval);
+          connector.transactionId = txId as number;
+          // Stop TransactionManager's own meter values timer (dashboard has its own)
+          charger.vcp.transactionManager.stopTransaction(txId);
+          console.log(`[TRANSACTION] ${cpId} conn ${connectorId}: transactionId=${txId}`);
+
+          // If car is already plugged in, start the charging sequence
+          if (connector.carSimulator) {
+            this.transitionToCharging(cpId, connectorId);
+          }
+          return;
+        }
+      }
+    }, 200);
+
+    return true;
+  }
+
+  async stopTransaction(
+    cpId: string,
+    connectorId: number,
+    reason: string = "Local"
+  ): Promise<boolean> {
+    const charger = this.chargers.get(cpId);
+    if (!charger?.vcp || !charger.connected) return false;
+
+    const connector = charger.connectors.find(
+      (c) => c.connectorId === connectorId
+    );
+    if (!connector || !connector.transactionId) return false;
+
+    // Send StopTransaction
+    charger.vcp.send(
+      stopTransactionOcppMessage.request({
+        transactionId: connector.transactionId,
+        meterStop: Math.round(connector.energyImported),
+        timestamp: new Date().toISOString(),
+        reason,
+      })
+    );
+
+    console.log(`[TRANSACTION] ${cpId} conn ${connectorId}: stopped transactionId=${connector.transactionId}`);
+
+    // Clear transaction state
+    connector.transactionId = undefined;
+    connector.powerImport = 0;
+
+    // Set connector status based on whether car is still plugged in
+    if (connector.carSimulator) {
+      this.setConnectorStatus(cpId, connectorId, "Preparing");
+    } else {
+      this.setConnectorStatus(cpId, connectorId, "Available");
+    }
+
+    return true;
+  }
+
+  private transitionToCharging(cpId: string, connectorId: number) {
+    const charger = this.chargers.get(cpId);
+    if (!charger) return;
+
+    const connector = charger.connectors.find(
+      (c) => c.connectorId === connectorId
+    );
+    if (!connector) return;
+
+    // Realistic: SuspendedEV first (EV initializing onboard charger)
+    this.setConnectorStatus(cpId, connectorId, "SuspendedEV");
+
+    // After 2-3 seconds, transition to Charging
+    const delay = 2000 + Math.random() * 1000;
+    setTimeout(() => {
+      // Only transition if still SuspendedEV with an active transaction
+      if (connector.status === "SuspendedEV" && connector.transactionId) {
+        this.setConnectorStatus(cpId, connectorId, "Charging");
+      }
+    }, delay);
   }
 
   serializeConnector(cpId: string, connector: ConnectorState): any {
