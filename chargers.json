@@ -1,50 +1,6 @@
 {
   "chargers": [
     {
-      "cpId": "T1845123031855--D",
-      "vendor": "ABB",
-      "model": "MD_TERRA_D",
-      "serialNumber": "T1845123031855--D",
-      "firmwareVersion": "4.0.4.22",
-      "connectors": 2,
-      "meterType": "MID",
-      "iccid": "8986647319048838343",
-      "imsi": "204869678867348",
-      "meterSerialNumber": "D6J567015"
-    },
-    {
-      "vendor": "VirtualCharger",
-      "model": "VCP-1",
-      "firmwareVersion": "1.0.0",
-      "connectors": 2,
-      "cpId": "VCP--001",
-      "serialNumber": "VCP--001"
-    },
-    {
-      "cpId": "VT8988831--D",
-      "vendor": "Volt Time",
-      "model": "One",
-      "serialNumber": "VT8988831--D",
-      "firmwareVersion": "V00.10.02",
-      "connectors": 1,
-      "meterType": "Internal",
-      "meterSerialNumber": "O6L663509",
-      "iccid": "8975263643266551648",
-      "imsi": "204189562335623"
-    },
-    {
-      "cpId": "VTD2578100--D",
-      "vendor": "Volt Time",
-      "model": "One",
-      "serialNumber": "VTD2578100--D",
-      "firmwareVersion": "V00.10.02",
-      "connectors": 1,
-      "meterType": "Internal",
-      "meterSerialNumber": "G6D969388",
-      "iccid": "8949954294113163717",
-      "imsi": "204393636977194"
-    },
-    {
       "cpId": "LIB-3049581--D",
       "vendor": "Alfen",
       "model": "NG920-61001",
@@ -54,7 +10,8 @@
       "meterType": "MID",
       "meterSerialNumber": "N6W047139",
       "iccid": "8972954173841338626",
-      "imsi": "204955642123046"
+      "imsi": "204955642123046",
+      "phases": 3
     }
   ]
 }

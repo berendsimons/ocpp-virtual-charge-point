@@ -306,24 +306,20 @@ export class ChargerManager {
 
       for (const connector of charger.connectors) {
         if (connector.status === "Charging" && connector.currentImport > 0) {
-          const voltage = 230;
-          let reportCurrent: number;
-          let reportPower: number;
-          let energyIncrement: number;
+          const chargerPhases = charger.config.phases || 3;
+          let perPhaseCurrent: number;
+          let effectivePhases: number;
           let socPercent: number | undefined;
 
           if (connector.carSimulator) {
-            // Car simulator takes over: tick the simulation
+            // Car simulator mode: tick the simulation
             const sim = connector.carSimulator;
             const result = sim.tick(15);
-            reportCurrent = result.currentA;
-            reportPower = result.powerW;
-            energyIncrement = result.energyIncrementWh;
-            connector.energyImported += energyIncrement;
-            connector.powerImport = reportPower;
+            perPhaseCurrent = result.currentA;
+            effectivePhases = sim.getEffectivePhases();
             socPercent = sim.getSocPercent();
 
-            // SuspendedEV override: when car reaches 100% SoC, transition to SuspendedEV
+            // SuspendedEV override: when car reaches 100% SoC
             if (socPercent >= 100 && result.currentA === 0) {
               connector.status = "SuspendedEV";
               connector.powerImport = 0;
@@ -338,46 +334,40 @@ export class ChargerManager {
               }
             }
           } else {
-            // Manual mode: simple linear calculation
-            const powerW = voltage * connector.currentImport;
-            connector.powerImport = powerW;
-            energyIncrement = (powerW * 15) / 3600;
-            connector.energyImported += energyIncrement;
-            reportCurrent = connector.currentImport;
-            reportPower = powerW;
+            // Manual mode: current flows on all charger phases
+            perPhaseCurrent = connector.currentImport;
+            effectivePhases = chargerPhases;
           }
 
-          // Determine per-phase current distribution using effective phases
-          // (min of charger installation phases and car's phases)
-          const effectivePhases = connector.carSimulator?.getEffectivePhases() ?? 1;
-          const chargerPhases = charger.config.phases || 3;
-          let currentL1: number, currentL2: number, currentL3: number;
-          if (effectivePhases === 3) {
-            currentL1 = reportCurrent;
-            currentL2 = reportCurrent;
-            currentL3 = reportCurrent;
-          } else if (effectivePhases === 2) {
-            currentL1 = reportCurrent;
-            currentL2 = reportCurrent;
-            currentL3 = 0;
-          } else {
-            currentL1 = reportCurrent;
-            currentL2 = 0;
-            currentL3 = 0;
-          }
+          // Per-phase current: only active phases carry current
+          const currentL1 = effectivePhases >= 1 ? perPhaseCurrent : 0;
+          const currentL2 = effectivePhases >= 2 ? perPhaseCurrent : 0;
+          const currentL3 = effectivePhases >= 3 ? perPhaseCurrent : 0;
 
-          // Voltage model: sags under load, rises when idle
-          // No-load voltage sits slightly above 230V nominal (~232V)
-          // Each amp of draw causes ~0.15V drop (typical residential impedance)
+          // Voltage model: sags under load, stays near no-load when idle
+          // No-load sits slightly above 230V nominal (~232V)
+          // Each amp causes ~0.15V drop (typical residential impedance)
+          // Tight jitter (±0.5V) so loaded vs idle phases are clearly distinct
           const noLoadV = 232;
           const dropPerAmp = 0.15;
-          const voltageL1 = noLoadV - (currentL1 * dropPerAmp) + (Math.random() * 2 - 1);
-          const voltageL2 = noLoadV - (currentL2 * dropPerAmp) + (Math.random() * 2 - 1);
-          const voltageL3 = noLoadV - (currentL3 * dropPerAmp) + (Math.random() * 2 - 1);
+          const voltageL1 = noLoadV - (currentL1 * dropPerAmp) + (Math.random() - 0.5);
+          const voltageL2 = noLoadV - (currentL2 * dropPerAmp) + (Math.random() - 0.5);
+          const voltageL3 = noLoadV - (currentL3 * dropPerAmp) + (Math.random() - 0.5);
+
+          // Calculate power from actual V * I per phase (realistic)
+          const reportPower =
+            voltageL1 * currentL1 +
+            voltageL2 * currentL2 +
+            voltageL3 * currentL3;
+
+          // Energy increment from actual power * time
+          const energyIncrementWh = (reportPower * 15) / 3600;
+          connector.energyImported += energyIncrementWh;
+          connector.powerImport = reportPower;
 
           // Simulate temperatures with small jitter
-          const bodyTemp = 20 + (Math.random() * 2 - 1); // ~19-21°C
-          const cableTemp = 19 + (Math.random() * 2 - 1); // ~18-20°C
+          const bodyTemp = 20 + (Math.random() * 2 - 1);
+          const cableTemp = 19 + (Math.random() * 2 - 1);
 
           const sampledValue: Array<{
             value: string;
@@ -562,8 +552,9 @@ export class ChargerManager {
 
     connector.currentImport = currentAmps;
 
-    // Update power calculation
-    connector.powerImport = 230 * currentAmps;
+    // Update power estimate (phases-aware, overwritten by next meter tick)
+    const phases = connector.carSimulator?.getEffectivePhases() ?? (charger.config.phases || 3);
+    connector.powerImport = 230 * currentAmps * phases;
 
     // Update car simulator's offered current if attached
     if (connector.carSimulator) {
