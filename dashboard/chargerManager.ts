@@ -19,6 +19,7 @@ export interface ChargerConfig {
   serialNumber: string;
   firmwareVersion: string;
   connectors: number;
+  phases: 1 | 3; // 1 = L1+N, 3 = L1+L2+L3+N
   meterType?: string;
   meterSerialNumber?: string;
   iccid?: string;
@@ -61,6 +62,8 @@ export class ChargerManager {
       if (fs.existsSync(CHARGERS_FILE)) {
         const data = JSON.parse(fs.readFileSync(CHARGERS_FILE, "utf-8"));
         for (const config of data.chargers || []) {
+          // Default phases to 3 for old configs without it
+          if (!config.phases) config.phases = 3;
           this.chargers.set(config.cpId, {
             config,
             vcp: null,
@@ -353,13 +356,18 @@ export class ChargerManager {
           const bodyTemp = 20 + (Math.random() * 2 - 1); // ~19-21°C
           const cableTemp = 19 + (Math.random() * 2 - 1); // ~18-20°C
 
-          // Determine per-phase current distribution
-          const phases = connector.carSimulator?.getProfile()?.phases ?? 1;
+          // Determine per-phase current distribution using effective phases
+          // (min of charger installation phases and car's phases)
+          const effectivePhases = connector.carSimulator?.getEffectivePhases() ?? 1;
           let currentL1: number, currentL2: number, currentL3: number;
-          if (phases === 3) {
+          if (effectivePhases === 3) {
             currentL1 = reportCurrent;
             currentL2 = reportCurrent;
             currentL3 = reportCurrent;
+          } else if (effectivePhases === 2) {
+            currentL1 = reportCurrent;
+            currentL2 = reportCurrent;
+            currentL3 = 0;
           } else {
             currentL1 = reportCurrent;
             currentL2 = 0;
@@ -733,7 +741,8 @@ export class ChargerManager {
     connector.carSimulator = new CarSimulator(
       profile,
       initialSoc,
-      connector.currentImport
+      connector.currentImport,
+      charger.config.phases
     );
 
     // Transition to Preparing (cable plugged in)
@@ -830,6 +839,7 @@ export class ChargerManager {
         energyDeliveredWh: sim.getEnergyDeliveredWh(),
         batteryCapacityKwh: profile.batteryCapacityKwh,
         phases: profile.phases,
+        effectivePhases: sim.getEffectivePhases(),
       };
     }
 

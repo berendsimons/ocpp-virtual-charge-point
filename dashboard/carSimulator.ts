@@ -4,7 +4,7 @@ export interface CarProfile {
   batteryCapacityKwh: number;
   maxAcCurrentA: number;
   onboardChargerKw: number;
-  phases: 1 | 3;
+  phases: 1 | 2 | 3;
   taperStartSoc: number; // e.g. 0.80 = 80%
   taperEndSoc: number; // e.g. 1.0 = 100%
   taperCurve: "linear" | "exponential";
@@ -12,9 +12,9 @@ export interface CarProfile {
 
 export const CAR_PROFILES: CarProfile[] = [
   {
-    id: "generic-small",
-    name: "Generic Small EV",
-    batteryCapacityKwh: 24,
+    id: "1p-16a",
+    name: "EV Sim (1x16A, 25kWh)",
+    batteryCapacityKwh: 25,
     maxAcCurrentA: 16,
     onboardChargerKw: 3.7,
     phases: 1,
@@ -23,57 +23,57 @@ export const CAR_PROFILES: CarProfile[] = [
     taperCurve: "linear",
   },
   {
-    id: "generic-medium",
-    name: "Generic Medium EV",
-    batteryCapacityKwh: 60,
+    id: "1p-32a",
+    name: "EV Sim (1x32A, 40kWh)",
+    batteryCapacityKwh: 40,
     maxAcCurrentA: 32,
     onboardChargerKw: 7.4,
     phases: 1,
-    taperStartSoc: 0.80,
-    taperEndSoc: 1.0,
-    taperCurve: "linear",
-  },
-  {
-    id: "generic-large",
-    name: "Generic Large EV",
-    batteryCapacityKwh: 75,
-    maxAcCurrentA: 16,
-    onboardChargerKw: 11,
-    phases: 3,
     taperStartSoc: 0.85,
     taperEndSoc: 1.0,
     taperCurve: "linear",
   },
   {
-    id: "tesla-model-3",
-    name: "Tesla Model 3",
-    batteryCapacityKwh: 57.5,
+    id: "2p-16a",
+    name: "EV Sim (2x16A, 50kWh)",
+    batteryCapacityKwh: 50,
     maxAcCurrentA: 16,
-    onboardChargerKw: 11,
+    onboardChargerKw: 7.4,
+    phases: 2,
+    taperStartSoc: 0.82,
+    taperEndSoc: 1.0,
+    taperCurve: "linear",
+  },
+  {
+    id: "2p-32a",
+    name: "EV Sim (2x32A, 65kWh)",
+    batteryCapacityKwh: 65,
+    maxAcCurrentA: 32,
+    onboardChargerKw: 14.7,
+    phases: 2,
+    taperStartSoc: 0.82,
+    taperEndSoc: 1.0,
+    taperCurve: "linear",
+  },
+  {
+    id: "3p-16a",
+    name: "EV Sim (3x16A, 75kWh)",
+    batteryCapacityKwh: 75,
+    maxAcCurrentA: 16,
+    onboardChargerKw: 11.0,
     phases: 3,
     taperStartSoc: 0.80,
     taperEndSoc: 1.0,
     taperCurve: "exponential",
   },
   {
-    id: "nissan-leaf",
-    name: "Nissan Leaf",
-    batteryCapacityKwh: 40,
+    id: "3p-32a",
+    name: "EV Sim (3x32A, 100kWh)",
+    batteryCapacityKwh: 100,
     maxAcCurrentA: 32,
-    onboardChargerKw: 6.6,
-    phases: 1,
-    taperStartSoc: 0.85,
-    taperEndSoc: 1.0,
-    taperCurve: "linear",
-  },
-  {
-    id: "vw-id3",
-    name: "VW ID.3",
-    batteryCapacityKwh: 58,
-    maxAcCurrentA: 16,
-    onboardChargerKw: 11,
+    onboardChargerKw: 22.0,
     phases: 3,
-    taperStartSoc: 0.82,
+    taperStartSoc: 0.80,
     taperEndSoc: 1.0,
     taperCurve: "exponential",
   },
@@ -81,14 +81,16 @@ export const CAR_PROFILES: CarProfile[] = [
 
 export class CarSimulator {
   private profile: CarProfile;
+  private effectivePhases: 1 | 2 | 3; // min(car phases, charger phases)
   private soc: number; // 0.0 to 1.0
   private offeredCurrentA: number;
   private actualCurrentA: number = 0;
   private energyDeliveredWh: number = 0;
   private margin: number; // random margin subtracted from offered current
 
-  constructor(profile: CarProfile, initialSoc: number, offeredCurrentA: number) {
+  constructor(profile: CarProfile, initialSoc: number, offeredCurrentA: number, chargerPhases: 1 | 3 = 3) {
     this.profile = profile;
+    this.effectivePhases = Math.min(profile.phases, chargerPhases) as 1 | 2 | 3;
     this.soc = Math.max(0, Math.min(0.99, initialSoc));
     this.offeredCurrentA = offeredCurrentA;
     // Random margin between 0.5 and 1.5A - car draws slightly below offered
@@ -97,6 +99,10 @@ export class CarSimulator {
 
   getProfile(): CarProfile {
     return this.profile;
+  }
+
+  getEffectivePhases(): number {
+    return this.effectivePhases;
   }
 
   getSoc(): number {
@@ -138,14 +144,8 @@ export class CarSimulator {
     const voltage = 230;
 
     // 1. Compute car's max acceptance current from onboard charger
-    let carMaxCurrentA: number;
-    if (this.profile.phases === 3) {
-      // P = V * I * sqrt(3) => I = P / (V * sqrt(3))
-      carMaxCurrentA = (this.profile.onboardChargerKw * 1000) / (voltage * Math.sqrt(3));
-    } else {
-      // P = V * I => I = P / V
-      carMaxCurrentA = (this.profile.onboardChargerKw * 1000) / voltage;
-    }
+    // P = phases * V_phase * I_per_phase => I = P / (phases * V)
+    let carMaxCurrentA = (this.profile.onboardChargerKw * 1000) / (voltage * this.profile.phases);
 
     // Also clamp to car's physical max AC current
     carMaxCurrentA = Math.min(carMaxCurrentA, this.profile.maxAcCurrentA);
@@ -187,12 +187,8 @@ export class CarSimulator {
     this.actualCurrentA = drawCurrent;
 
     // 6. Calculate energy delivered and update SoC
-    let powerW: number;
-    if (this.profile.phases === 3) {
-      powerW = voltage * drawCurrent * Math.sqrt(3);
-    } else {
-      powerW = voltage * drawCurrent;
-    }
+    // P = effectivePhases * V_phase * I_per_phase
+    const powerW = voltage * drawCurrent * this.effectivePhases;
 
     const energyIncrementWh = (powerW * intervalSeconds) / 3600;
     this.energyDeliveredWh += energyIncrementWh;

@@ -61,6 +61,7 @@ api.post("/chargers", async (c) => {
     serialNumber: body.serialNumber || body.cpId,
     firmwareVersion: body.firmwareVersion || "1.0.0",
     connectors: body.connectors || 1,
+    phases: body.phases === 1 ? 1 : 3 as 1 | 3,
     meterType: body.meterType,
     meterSerialNumber: body.meterSerialNumber,
     iccid: body.iccid,
@@ -80,7 +81,7 @@ api.post("/chargers", async (c) => {
 // Generate multiple chargers
 api.post("/chargers/generate", async (c) => {
   const body = await c.req.json();
-  const { prefix, count, vendor, model, firmwareVersion, connectors } = body;
+  const { prefix, count, vendor, model, firmwareVersion, connectors, phases } = body;
 
   if (!prefix || !count) {
     return c.json({ error: "prefix and count are required" }, 400);
@@ -91,6 +92,7 @@ api.post("/chargers/generate", async (c) => {
     model: model || "VCP-1",
     firmwareVersion: firmwareVersion || "1.0.0",
     connectors: connectors || 1,
+    phases: phases === 1 ? 1 : 3,
   });
 
   return c.json({ success: true, created, count: created.length });

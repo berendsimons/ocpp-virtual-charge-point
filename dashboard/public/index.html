@@ -442,7 +442,7 @@
               <button class="btn btn-sm btn-secondary" onclick="showGenerateModal()">Generate Multiple</button>
             </div>
             <table>
-              <thead><tr><th class="checkbox-cell"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"></th><th>Chargepoint ID</th><th>Conn. 0</th><th>Conn. 1</th><th>Conn. 2</th><th>Vendor</th><th>Model</th><th>Max. Current</th></tr></thead>
+              <thead><tr><th class="checkbox-cell"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"></th><th>Chargepoint ID</th><th>Conn. 0</th><th>Conn. 1</th><th>Conn. 2</th><th>Vendor</th><th>Model</th><th>Install</th></tr></thead>
               <tbody id="chargersTableBody"></tbody>
             </table>
             <div class="table-empty" id="tableEmpty" style="display: none;">
@@ -559,7 +559,7 @@
           <div class="info-item"><div class="info-label">Status</div><div class="info-value" id="panelStatus">Offline</div></div>
           <div class="info-item"><div class="info-label">Serial Number</div><div class="info-value" id="panelSerial">-</div></div>
           <div class="info-item"><div class="info-label">Firmware</div><div class="info-value" id="panelFirmware">-</div></div>
-          <div class="info-item"><div class="info-label">Max Current</div><div class="info-value" id="panelMaxCurrent">32 A</div></div>
+          <div class="info-item"><div class="info-label">Installation</div><div class="info-value" id="panelMaxCurrent">3-phase</div></div>
         </div>
       </div>
       <div class="panel-section">
@@ -612,6 +612,14 @@
               <select class="form-select" id="addMeterType"><option value="Internal">Internal</option><option value="MID">MID</option></select>
             </div>
           </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Installation Phases</label>
+              <select class="form-select" id="addPhases">
+                <option value="3">3-phase (L1+L2+L3+N)</option>
+                <option value="1">1-phase (L1+N)</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -635,6 +643,13 @@
         <div class="form-group">
           <label class="form-label">Count *</label>
           <input type="number" class="form-input" id="genCount" value="10" min="1" max="100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Installation Phases</label>
+          <select class="form-select" id="genPhases">
+            <option value="3">3-phase (L1+L2+L3+N)</option>
+            <option value="1">1-phase (L1+N)</option>
+          </select>
         </div>
         <div id="genPreview" style="margin-top: 16px; padding: 16px; background: var(--bg-cream); border-radius: var(--radius-sm); display: none;">
           <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">Example IDs that will be generated:</div>
@@ -878,7 +893,7 @@
           if (!charger.connected) return `<span class="status-badge offline"><span class="status-badge-dot"></span>${conn.status}</span>${evTag}`;
           return `<span class="status-badge ${conn.status}"><span class="status-badge-dot"></span>${conn.status}</span>${evTag}`;
         };
-        return `<tr><td class="checkbox-cell" onclick="event.stopPropagation();"><input type="checkbox" ${selectedChargers.has(charger.cpId) ? 'checked' : ''} onchange="toggleSelection('${charger.cpId}')"></td><td class="charger-id-cell copyable" onclick="copyToClipboard('${charger.cpId}', event)" title="Click to copy">${charger.cpId}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(0)}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(1)}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(2)}</td><td onclick="openChargerPanel('${charger.cpId}')">${charger.config.vendor}</td><td onclick="openChargerPanel('${charger.cpId}')">${charger.config.model}</td><td onclick="openChargerPanel('${charger.cpId}')">${charger.config.maxCurrent || 32} A</td></tr>`;
+        return `<tr><td class="checkbox-cell" onclick="event.stopPropagation();"><input type="checkbox" ${selectedChargers.has(charger.cpId) ? 'checked' : ''} onchange="toggleSelection('${charger.cpId}')"></td><td class="charger-id-cell copyable" onclick="copyToClipboard('${charger.cpId}', event)" title="Click to copy">${charger.cpId}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(0)}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(1)}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(2)}</td><td onclick="openChargerPanel('${charger.cpId}')">${charger.config.vendor}</td><td onclick="openChargerPanel('${charger.cpId}')">${charger.config.model}</td><td onclick="openChargerPanel('${charger.cpId}')">${(charger.config.phases || 3) === 1 ? '1ph' : '3ph'}</td></tr>`;
       }).join('');
     }
 
@@ -981,7 +996,7 @@
       document.getElementById('panelStatus').textContent = currentCharger.connected ? 'Online' : 'Offline';
       document.getElementById('panelSerial').textContent = currentCharger.config.serialNumber || cpId;
       document.getElementById('panelFirmware').textContent = currentCharger.config.firmwareVersion || '1.0.0';
-      document.getElementById('panelMaxCurrent').textContent = (currentCharger.config.maxCurrent || 32) + ' A';
+      document.getElementById('panelMaxCurrent').textContent = (currentCharger.config.phases || 3) === 1 ? '1-phase (L1+N)' : '3-phase (L1+L2+L3+N)';
       const hasAnyCar = currentCharger.connectors.some(c => c.carSimulator);
       document.getElementById('panelConnectors').innerHTML = currentCharger.connectors.map(conn => {
         const sim = conn.carSimulator;
@@ -1005,7 +1020,7 @@
                 <div class="car-info-stat"><div class="car-info-stat-label">Actual Draw</div><div class="car-info-stat-value">${displayCurrent} A</div></div>
                 <div class="car-info-stat"><div class="car-info-stat-label">EV Energy</div><div class="car-info-stat-value">${displayEnergy} kWh</div></div>
                 <div class="car-info-stat"><div class="car-info-stat-label">Battery</div><div class="car-info-stat-value">${sim.batteryCapacityKwh} kWh</div></div>
-                <div class="car-info-stat"><div class="car-info-stat-label">Phases</div><div class="car-info-stat-value">${sim.phases}ph</div></div>
+                <div class="car-info-stat"><div class="car-info-stat-label">Charging</div><div class="car-info-stat-value">${sim.effectivePhases || sim.phases}ph</div></div>
               </div>
             </div>`;
         } else {
@@ -1059,6 +1074,7 @@
         model: document.getElementById('addModel').value,
         serialNumber: document.getElementById('addSerial').value || cpId,
         connectors: parseInt(document.getElementById('addConnectors').value, 10),
+        phases: parseInt(document.getElementById('addPhases').value, 10),
         firmwareVersion: document.getElementById('addFirmware').value,
         meterType: document.getElementById('addMeterType').value,
         iccid: generateIccid(),
@@ -1094,7 +1110,8 @@
         const cpId = generateRandomId(model);
         const result = await api('/chargers', { method: 'POST', body: JSON.stringify({
           cpId, vendor: model.vendor, model: model.name, serialNumber: cpId,
-          connectors: model.connectors, firmwareVersion: model.firmware, meterType: model.meterType,
+          connectors: model.connectors, phases: parseInt(document.getElementById('genPhases').value, 10) || 3,
+          firmwareVersion: model.firmware, meterType: model.meterType,
           iccid: generateIccid(), imsi: generateImsi(), meterSerialNumber: generateMeterSerial()
         }) });
         if (result.success) successCount++;
@@ -1261,7 +1278,7 @@
         if (!Array.isArray(data)) { console.error('Car profiles response is not an array:', data); return; }
         carProfiles = data;
         const select = document.getElementById('plugCarProfile');
-        select.innerHTML = carProfiles.map(p => `<option value="${p.id}">${p.name} (${p.batteryCapacityKwh} kWh, ${p.onboardChargerKw} kW, ${p.phases}ph)</option>`).join('');
+        select.innerHTML = carProfiles.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
         updatePlugCarPreview();
       } catch (err) { console.error('Failed to load car profiles:', err); }
     }
@@ -1283,15 +1300,23 @@
       const soc = parseInt(document.getElementById('plugCarSoc').value) / 100;
       const profile = carProfiles.find(p => p.id === profileId);
       if (profile) {
+        // Compute effective phases: min of charger installation and car phases
+        const charger = plugCarTarget ? chargers.find(c => c.cpId === plugCarTarget.cpId) : null;
+        const chargerPhases = charger?.config?.phases || 3;
+        const effectivePhases = Math.min(profile.phases, chargerPhases);
+        const effectivePowerKw = (effectivePhases * 230 * profile.maxAcCurrentA) / 1000;
         const remainingKwh = profile.batteryCapacityKwh * (1 - soc);
-        const chargePowerKw = profile.onboardChargerKw;
-        const hoursEstimate = remainingKwh / chargePowerKw;
+        const hoursEstimate = remainingKwh / effectivePowerKw;
         const hours = Math.floor(hoursEstimate);
         const minutes = Math.round((hoursEstimate - hours) * 60);
+        const phaseNote = effectivePhases < profile.phases
+          ? ` (car is ${profile.phases}ph, charger is ${chargerPhases}ph)`
+          : '';
         document.getElementById('plugCarEstimate').innerHTML =
           `<strong>${profile.name}</strong>: ${remainingKwh.toFixed(1)} kWh to charge (${profile.batteryCapacityKwh} kWh battery)<br>` +
-          `Estimated time at ${chargePowerKw} kW: ~${hours}h ${minutes}m<br>` +
-          `<span style="font-size:11px; color:var(--text-muted);">${profile.phases}-phase, taper starts at ${Math.round(profile.taperStartSoc * 100)}% SoC (${profile.taperCurve})</span>`;
+          `Charging at ${effectivePhases}x${profile.maxAcCurrentA}A = ${effectivePowerKw.toFixed(1)} kW${phaseNote}<br>` +
+          `Estimated time: ~${hours}h ${minutes}m<br>` +
+          `<span style="font-size:11px; color:var(--text-muted);">Taper starts at ${Math.round(profile.taperStartSoc * 100)}% SoC (${profile.taperCurve})</span>`;
       }
     }
 
