@@ -549,6 +549,62 @@ api.post("/plugchoice/sites/:uuid/cards", async (c) => {
   }
 });
 
+// List groups at a site
+api.get("/plugchoice/sites/:uuid/groups", async (c) => {
+  try {
+    const uuid = c.req.param("uuid");
+    const result = await plugchoiceFetch("GET", `/sites/${uuid}/groups`);
+    return c.json(result.data || []);
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured")
+      return c.json({ error: err.message }, 401);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Create a group at a site
+api.post("/plugchoice/sites/:uuid/groups", async (c) => {
+  try {
+    const uuid = c.req.param("uuid");
+    const body = await c.req.json();
+    const result = await plugchoiceFetch("POST", `/sites/${uuid}/groups`, body);
+    return c.json(result);
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured")
+      return c.json({ error: err.message }, 401);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Assign chargers to a group
+api.post("/plugchoice/sites/:uuid/groups/:groupId/chargers", async (c) => {
+  try {
+    const uuid = c.req.param("uuid");
+    const groupId = c.req.param("groupId");
+    const body = await c.req.json();
+    const result = await plugchoiceFetch("POST", `/sites/${uuid}/groups/${groupId}/chargers`, body);
+    return c.json(result);
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured")
+      return c.json({ error: err.message }, 401);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Setup a charger (phases, max_current, group, phase_rotation)
+api.post("/plugchoice/chargers/:uuid/setup", async (c) => {
+  try {
+    const uuid = c.req.param("uuid");
+    const body = await c.req.json();
+    const result = await plugchoiceFetch("POST", `/chargers/${uuid}/setup`, body);
+    return c.json(result);
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured")
+      return c.json({ error: err.message }, 401);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // List all team chargers (auto-paginated)
 api.get("/plugchoice/team-chargers", async (c) => {
   try {

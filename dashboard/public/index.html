@@ -609,6 +609,10 @@
             <p class="page-subtitle">Manage Plugchoice sites</p>
           </div>
           <div class="page-actions">
+            <button class="btn btn-secondary" onclick="setupAllLocationsAndChargers()" id="setupAllBtn">
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              Setup All
+            </button>
             <button class="btn btn-secondary" onclick="showGenerateLocationsModal()">
               <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
               Generate Locations
@@ -2008,21 +2012,25 @@
 
     async function loadLocationDetail(uuid) {
       try {
-        const [site, chargers, cards] = await Promise.all([
+        const [site, chargers, cards, groups] = await Promise.all([
           api(`/plugchoice/sites/${uuid}/detail`),
           api(`/plugchoice/sites/${uuid}/chargers-list`),
           api(`/plugchoice/sites/${uuid}/cards`),
+          api(`/plugchoice/sites/${uuid}/groups`),
         ]);
 
         document.getElementById('locDetailName').textContent = site.name || 'Unknown';
         const addr = [site.street, site.house_number, site.postal_code, site.city].filter(Boolean).join(', ');
         document.getElementById('locDetailAddress').textContent = addr || 'No address';
 
+        const mainGroup = groups.length > 0 ? groups[0] : null;
         const createdDate = site.created_at ? new Date(site.created_at).toLocaleDateString() : '-';
         document.getElementById('locDetailOverview').innerHTML = [
           { label: 'City', value: site.city || '-' },
           { label: 'Postal Code', value: site.postal_code || '-' },
           { label: 'Country', value: site.country || '-' },
+          { label: 'Main Fuse', value: mainGroup ? `${mainGroup.total_amps}A` : '<span style="color:var(--accent-orange)">None</span>' },
+          { label: 'Net Type', value: mainGroup?.net_type || '-' },
           { label: 'Chargers', value: chargers.length },
           { label: 'Cards', value: cards.length },
           { label: 'Created', value: createdDate },
@@ -2165,16 +2173,83 @@
                 await api(`/plugchoice/sites/${siteUuid}/cards`, { method: 'POST', body: JSON.stringify(card) });
               } catch(e) { console.error('Failed to create card:', e); }
             }
+            // Auto-create power management group (main fuse)
+            const fuseAmps = [25, 32, 35, 40, 50][Math.floor(Math.random() * 5)];
+            try {
+              await api(`/plugchoice/sites/${siteUuid}/groups`, { method: 'POST', body: JSON.stringify({ net_type: 'TN', total_amps: fuseAmps }) });
+            } catch(e) { console.error('Failed to create group:', e); }
           }
         } catch(e) { console.error('Failed to create location:', e); }
         const pct = Math.round(((i+1)/count)*100);
         document.getElementById('genLocProgressBar').style.width = pct + '%';
-        document.getElementById('genLocProgressText').textContent = `Creating... ${i+1}/${count} (+ cards)`;
+        document.getElementById('genLocProgressText').textContent = `Creating... ${i+1}/${count} (+ cards + group)`;
       }
       document.getElementById('genLocBtn').disabled = false;
-      showToast(`Created ${success} location(s) with cards`, 'success');
+      showToast(`Created ${success} location(s) with cards & groups`, 'success');
       closeGenerateLocationsModal();
       loadLocations();
+    }
+
+    // ===== SETUP ALL (RETROACTIVE) =====
+    async function setupAllLocationsAndChargers() {
+      if (!confirm('This will create groups for all sites without one, and setup + assign all chargers. Continue?')) return;
+      const btn = document.getElementById('setupAllBtn');
+      btn.disabled = true;
+      btn.textContent = 'Working...';
+
+      try {
+        const sites = await api('/plugchoice/sites');
+        const teamChargers = await api('/plugchoice/team-chargers');
+        let groupsCreated = 0, chargersSetup = 0, errors = 0;
+
+        for (let si = 0; si < sites.length; si++) {
+          const site = sites[si];
+          btn.textContent = `${si+1}/${sites.length} sites...`;
+
+          // Ensure site has a group
+          let groups = await api(`/plugchoice/sites/${site.uuid}/groups`);
+          let groupId;
+          if (groups.length > 0) {
+            groupId = groups[0].id;
+          } else {
+            const fuseAmps = [25, 32, 35, 40, 50][Math.floor(Math.random() * 5)];
+            try {
+              const grpResult = await api(`/plugchoice/sites/${site.uuid}/groups`, { method: 'POST', body: JSON.stringify({ net_type: 'TN', total_amps: fuseAmps }) });
+              groupId = grpResult.data?.id || grpResult.id;
+              groupsCreated++;
+            } catch(e) { errors++; console.error('Group create failed:', site.name, e); continue; }
+          }
+
+          // Get chargers at this site
+          const siteChargers = teamChargers.filter(tc => tc.site?.uuid === site.uuid);
+          for (const tc of siteChargers) {
+            try {
+              // Determine phases from local config
+              const localCh = chargers.find(c => c.cpId === tc.identity);
+              const phases = localCh?.config?.phases || 3;
+              const maxCurrent = phases === 1 ? 16 : 32;
+              const phaseRotation = phases === 1 ? 'R' : 'RST';
+
+              // Setup charger
+              await api(`/plugchoice/chargers/${tc.uuid}/setup`, { method: 'POST', body: JSON.stringify({
+                phases: String(phases), max_current: maxCurrent, group: groupId, net_type: 'TN', phase_rotation: phaseRotation
+              })});
+
+              // Assign to group
+              await api(`/plugchoice/sites/${site.uuid}/groups/${groupId}/chargers`, { method: 'POST', body: JSON.stringify({ charger_uuids: [tc.uuid] }) });
+              chargersSetup++;
+            } catch(e) { errors++; console.error('Charger setup failed:', tc.identity, e); }
+          }
+        }
+
+        showToast(`Done: ${groupsCreated} groups created, ${chargersSetup} chargers configured${errors > 0 ? `, ${errors} errors` : ''}`, 'success');
+        loadLocations();
+      } catch(e) {
+        showToast('Setup All failed: ' + e.message, 'error');
+        console.error(e);
+      }
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> Setup All';
     }
 
     // ===== ATTACH TO LOCATION =====
@@ -2245,40 +2320,88 @@
       }
     });
 
+    // Setup a charger after attaching: configure phases/current + assign to group
+    let _teamChargersCache = null;
+    let _siteGroupCache = {}; // siteUuid -> groupId
+
+    async function setupChargerAtSite(identity, siteUuid) {
+      try {
+        // Get team chargers (cached)
+        if (!_teamChargersCache) {
+          _teamChargersCache = await api('/plugchoice/team-chargers');
+        }
+        const tc = _teamChargersCache.find(c => c.identity === identity);
+        if (!tc) return;
+
+        // Get local charger config for phases
+        const localCh = chargers.find(c => c.cpId === identity);
+        const phases = localCh?.config?.phases || 3;
+        const maxCurrent = phases === 1 ? 16 : 32;
+        const phaseRotation = phases === 1 ? 'R' : 'RST';
+
+        // Get or create group for this site
+        if (!_siteGroupCache[siteUuid]) {
+          const groups = await api(`/plugchoice/sites/${siteUuid}/groups`);
+          if (groups.length > 0) {
+            _siteGroupCache[siteUuid] = groups[0].id;
+          } else {
+            const fuseAmps = [25, 32, 35, 40, 50][Math.floor(Math.random() * 5)];
+            const grpResult = await api(`/plugchoice/sites/${siteUuid}/groups`, { method: 'POST', body: JSON.stringify({ net_type: 'TN', total_amps: fuseAmps }) });
+            _siteGroupCache[siteUuid] = grpResult.data?.id || grpResult.id;
+          }
+        }
+        const groupId = _siteGroupCache[siteUuid];
+
+        // Setup charger
+        await api(`/plugchoice/chargers/${tc.uuid}/setup`, { method: 'POST', body: JSON.stringify({
+          phases: String(phases), max_current: maxCurrent, group: groupId, net_type: 'TN', phase_rotation: phaseRotation
+        })});
+
+        // Assign charger to group
+        await api(`/plugchoice/sites/${siteUuid}/groups/${groupId}/chargers`, { method: 'POST', body: JSON.stringify({ charger_uuids: [tc.uuid] }) });
+      } catch(e) { console.error('Failed to setup charger:', identity, e); }
+    }
+
     async function executeAttachLocation() {
       const siteUuid = document.getElementById('attachLocationSelect').value;
       const identities = [...selectedChargers];
       document.getElementById('attachLocationProgress').style.display = 'block';
       document.getElementById('attachLocationBtn').disabled = true;
+      _teamChargersCache = null; // refresh
+      _siteGroupCache = {};
       let success = 0, fail = 0;
       if (siteUuid === '_random') {
-        // Assign each charger to a random site
         const availableSites = plugchoiceSites.length > 0 ? plugchoiceSites : [];
         if (availableSites.length === 0) { showToast('No locations available', 'error'); return; }
         for (let i = 0; i < identities.length; i++) {
           const site = availableSites[Math.floor(Math.random() * availableSites.length)];
           try {
             const resp = await api(`/plugchoice/sites/${site.uuid}/chargers`, { method: 'POST', body: JSON.stringify({ identity: identities[i] }) });
-            if (resp.error) { fail++; } else { success++; }
+            if (resp.error) { fail++; } else {
+              success++;
+              await setupChargerAtSite(identities[i], site.uuid);
+            }
           } catch(e) { fail++; }
           const pct = Math.round(((i+1)/identities.length)*100);
           document.getElementById('attachLocationProgressBar').style.width = pct + '%';
-          document.getElementById('attachLocationProgressText').textContent = `Attaching... ${i+1}/${identities.length}`;
+          document.getElementById('attachLocationProgressText').textContent = `Attaching + setup... ${i+1}/${identities.length}`;
         }
       } else {
-        // Assign all to one specific site
         for (let i = 0; i < identities.length; i++) {
           try {
             const resp = await api(`/plugchoice/sites/${siteUuid}/chargers`, { method: 'POST', body: JSON.stringify({ identity: identities[i] }) });
-            if (resp.error) { fail++; } else { success++; }
+            if (resp.error) { fail++; } else {
+              success++;
+              await setupChargerAtSite(identities[i], siteUuid);
+            }
           } catch(e) { fail++; }
           const pct = Math.round(((i+1)/identities.length)*100);
           document.getElementById('attachLocationProgressBar').style.width = pct + '%';
-          document.getElementById('attachLocationProgressText').textContent = `Attaching... ${i+1}/${identities.length}`;
+          document.getElementById('attachLocationProgressText').textContent = `Attaching + setup... ${i+1}/${identities.length}`;
         }
       }
       document.getElementById('attachLocationBtn').disabled = false;
-      showToast(`Attached ${success} charger(s)${fail > 0 ? `, ${fail} failed` : ''}`, success > 0 ? 'success' : 'error');
+      showToast(`Attached & configured ${success} charger(s)${fail > 0 ? `, ${fail} failed` : ''}`, success > 0 ? 'success' : 'error');
       closeAttachLocationModal();
       loadChargerSiteMap();
       loadLocations();
