@@ -37,6 +37,7 @@ export interface ConnectorState {
   powerImport: number; // Watts
   energyImported: number; // Wh cumulative
   transactionId?: number;
+  idTag?: string;
   carSimulator?: CarSimulator;
 }
 
@@ -867,6 +868,9 @@ export class ChargerManager {
       })
     );
 
+    // Store idTag on connector for tracking
+    connector.idTag = idTag;
+
     // Set to Preparing (waiting for EV or already has one)
     this.setConnectorStatus(cpId, connectorId, "Preparing");
 
@@ -928,6 +932,7 @@ export class ChargerManager {
 
     // Clear transaction state
     connector.transactionId = undefined;
+    connector.idTag = undefined;
     connector.powerImport = 0;
 
     // Set connector status based on whether car is still plugged in
@@ -971,6 +976,7 @@ export class ChargerManager {
       powerImport: connector.powerImport,
       energyImported: connector.energyImported,
       transactionId: connector.transactionId,
+      idTag: connector.idTag,
     };
 
     if (connector.carSimulator) {

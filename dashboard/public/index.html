@@ -1379,13 +1379,46 @@
       showToast(`Exported ${selected.length} charger ID(s)`, 'success');
     }
 
+    // Get a random unused idTag from the charger's location cards
+    let _siteCardsCache = {}; // siteUuid -> cards[]
+    async function getIdTagForCharger(cpId) {
+      const siteInfo = chargerSiteMap[cpId];
+      if (!siteInfo) return 'VIRTUAL001'; // fallback if charger has no location
+
+      // Fetch & cache cards for this site
+      if (!_siteCardsCache[siteInfo.siteUuid]) {
+        try {
+          _siteCardsCache[siteInfo.siteUuid] = await api(`/plugchoice/sites/${siteInfo.siteUuid}/cards`);
+        } catch(e) { return 'VIRTUAL001'; }
+      }
+      const siteCards = _siteCardsCache[siteInfo.siteUuid];
+      if (!siteCards || siteCards.length === 0) return 'VIRTUAL001';
+
+      // Collect idTags currently in active transactions at this location
+      const activeIdTags = new Set();
+      for (const ch of chargers) {
+        if (chargerSiteMap[ch.cpId]?.siteUuid === siteInfo.siteUuid) {
+          for (const conn of (ch.connectors || [])) {
+            if (conn.transactionId && conn.idTag) activeIdTags.add(conn.idTag);
+          }
+        }
+      }
+
+      // Filter to unused cards
+      const available = siteCards.filter(c => !activeIdTags.has(c.id_token));
+      const pool = available.length > 0 ? available : siteCards; // fallback to all if all used
+      return pool[Math.floor(Math.random() * pool.length)].id_token;
+    }
+
     async function bulkStartTransaction() {
       showToast(`Starting transactions on ${selectedChargers.size} charger(s)...`, 'success');
+      _siteCardsCache = {}; // clear cache for fresh data
       for (const cpId of selectedChargers) {
         const ch = chargers.find(c => c.cpId === cpId);
         if (!ch || !ch.connected) continue;
         for (const conn of ch.connectors) {
-          await api(`/chargers/${cpId}/connectors/${conn.connectorId}/start-transaction`, { method: 'POST', body: JSON.stringify({}) });
+          const idTag = await getIdTagForCharger(cpId);
+          await api(`/chargers/${cpId}/connectors/${conn.connectorId}/start-transaction`, { method: 'POST', body: JSON.stringify({ idTag }) });
         }
       }
       loadChargers();
@@ -1478,8 +1511,10 @@
           showToast('Connecting...', 'success');
           break;
         case 'startTransaction':
+          _siteCardsCache = {};
           for (const conn of currentCharger.connectors) {
-            await api(`/chargers/${currentCharger.cpId}/connectors/${conn.connectorId}/start-transaction`, { method: 'POST', body: JSON.stringify({}) });
+            const idTag = await getIdTagForCharger(currentCharger.cpId);
+            await api(`/chargers/${currentCharger.cpId}/connectors/${conn.connectorId}/start-transaction`, { method: 'POST', body: JSON.stringify({ idTag }) });
           }
           showToast('Transaction starting...', 'success');
           break;
