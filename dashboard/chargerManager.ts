@@ -894,9 +894,19 @@ export class ChargerManager {
           console.log(`[TRANSACTION] ${cpId} conn ${connectorId}: transactionId=${txId}`);
 
           // If car is already plugged in, start the charging sequence
-          if (connector.carSimulator) {
-            this.transitionToCharging(cpId, connectorId);
+          // Otherwise, auto-plug a random car to simulate realistic EV behavior
+          if (!connector.carSimulator) {
+            const profile = CAR_PROFILES[Math.floor(Math.random() * CAR_PROFILES.length)];
+            const initialSoc = 0.1 + Math.random() * 0.5; // 10-60% SoC
+            connector.carSimulator = new CarSimulator(
+              profile,
+              initialSoc,
+              connector.currentImport,
+              charger.config.phases
+            );
+            console.log(`[TRANSACTION] ${cpId} conn ${connectorId}: auto-plugged ${profile.name} at ${Math.round(initialSoc*100)}% SoC`);
           }
+          this.transitionToCharging(cpId, connectorId);
           return;
         }
       }
@@ -957,8 +967,8 @@ export class ChargerManager {
     // Realistic: SuspendedEV first (EV initializing onboard charger)
     this.setConnectorStatus(cpId, connectorId, "SuspendedEV");
 
-    // After 2-3 seconds, transition to Charging
-    const delay = 2000 + Math.random() * 1000;
+    // After 1-4 seconds, transition to Charging
+    const delay = 1000 + Math.random() * 3000;
     setTimeout(() => {
       // Only transition if still SuspendedEV with an active transaction
       if (connector.status === "SuspendedEV" && connector.transactionId) {
