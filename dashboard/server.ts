@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import { chargerManager } from "./chargerManager";
 import * as path from "node:path";
 import * as fs from "node:fs";
+import * as https from "node:https";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -335,6 +336,285 @@ api.post("/settings/ws-url", async (c) => {
   }
   chargerManager.setWsUrl(body.wsUrl);
   return c.json({ success: true, wsUrl: body.wsUrl });
+});
+
+// --- Plugchoice API Proxy ---
+
+const plugchoiceTokenPath = path.join(__dirname, "plugchoice.json");
+
+function loadPlugchoiceToken(): string | null {
+  try {
+    if (fs.existsSync(plugchoiceTokenPath)) {
+      const data = JSON.parse(fs.readFileSync(plugchoiceTokenPath, "utf-8"));
+      return data.token || null;
+    }
+  } catch {}
+  return null;
+}
+
+function savePlugchoiceToken(token: string): void {
+  fs.writeFileSync(plugchoiceTokenPath, JSON.stringify({ token }, null, 2), "utf-8");
+}
+
+function plugchoiceFetch(
+  method: string,
+  apiPath: string,
+  body?: any
+): Promise<any> {
+  const token = loadPlugchoiceToken();
+  if (!token) {
+    return Promise.reject(new Error("No Plugchoice token configured"));
+  }
+
+  const url = new URL("https://app.plugchoice.com/api/v3" + apiPath);
+  const postData = body ? JSON.stringify(body) : undefined;
+
+  const options: https.RequestOptions = {
+    hostname: url.hostname,
+    port: 443,
+    path: url.pathname + url.search,
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(postData ? { "Content-Length": Buffer.byteLength(postData) } : {}),
+    },
+  };
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => chunks.push(chunk));
+      res.on("end", () => {
+        const raw = Buffer.concat(chunks).toString("utf-8");
+        if (res.statusCode && res.statusCode >= 400) {
+          try {
+            const parsed = JSON.parse(raw);
+            reject(new Error(parsed.message || `HTTP ${res.statusCode}: ${raw}`));
+          } catch {
+            reject(new Error(`HTTP ${res.statusCode}: ${raw}`));
+          }
+          return;
+        }
+        // Handle 204 No Content or empty body
+        if (!raw || raw.trim() === "") {
+          resolve(null);
+          return;
+        }
+        try {
+          resolve(JSON.parse(raw));
+        } catch {
+          reject(new Error(`Failed to parse JSON: ${raw}`));
+        }
+      });
+    });
+    req.on("error", reject);
+    if (postData) {
+      req.write(postData);
+    }
+    req.end();
+  });
+}
+
+async function plugchoiceFetchAllPages(apiPath: string): Promise<any[]> {
+  const allItems: any[] = [];
+  let page = 1;
+  while (true) {
+    const separator = apiPath.includes("?") ? "&" : "?";
+    const res = await plugchoiceFetch("GET", `${apiPath}${separator}page=${page}`);
+    const items = res.data || [];
+    allItems.push(...items);
+    // Handle both pagination formats: links.next (sites) and next_page_url (team chargers)
+    const hasMore = (res.links && res.links.next) || res.next_page_url;
+    if (!hasMore || items.length === 0) break;
+    page++;
+  }
+  return allItems;
+}
+
+let cachedTeamUuid: string | null = null;
+
+// Token management
+api.get("/plugchoice/token", (c) => {
+  const token = loadPlugchoiceToken();
+  return c.json({ hasToken: !!token });
+});
+
+api.post("/plugchoice/token", async (c) => {
+  const body = await c.req.json();
+  if (!body.token) {
+    return c.json({ error: "token is required" }, 400);
+  }
+  savePlugchoiceToken(body.token);
+  cachedTeamUuid = null; // reset cache when token changes
+  return c.json({ success: true });
+});
+
+// List all sites (auto-paginated)
+api.get("/plugchoice/sites", async (c) => {
+  try {
+    const sites = await plugchoiceFetchAllPages("/sites");
+    return c.json(sites);
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured") {
+      return c.json({ error: err.message }, 401);
+    }
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Create a site
+api.post("/plugchoice/sites", async (c) => {
+  try {
+    const body = await c.req.json();
+    const result = await plugchoiceFetch("POST", "/sites", body);
+    return c.json(result);
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured") {
+      return c.json({ error: err.message }, 401);
+    }
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Delete a site
+api.delete("/plugchoice/sites/:uuid", async (c) => {
+  try {
+    const uuid = c.req.param("uuid");
+    const result = await plugchoiceFetch("DELETE", `/sites/${uuid}`);
+    return c.json(result ?? { success: true });
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured") {
+      return c.json({ error: err.message }, 401);
+    }
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// List all team chargers (auto-paginated)
+api.get("/plugchoice/team-chargers", async (c) => {
+  try {
+    if (!cachedTeamUuid) {
+      const teamsRes = await plugchoiceFetch("GET", "/teams");
+      const teams = teamsRes.data || [];
+      if (teams.length === 0) {
+        return c.json({ error: "No teams found" }, 404);
+      }
+      cachedTeamUuid = teams[0].uuid;
+    }
+    const chargers = await plugchoiceFetchAllPages(`/teams/${cachedTeamUuid}/chargers`);
+    return c.json(chargers);
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured") {
+      return c.json({ error: err.message }, 401);
+    }
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Attach a charger to a site (auto-fetches pincode)
+api.post("/plugchoice/sites/:uuid/chargers", async (c) => {
+  try {
+    const siteUuid = c.req.param("uuid");
+    const body = await c.req.json();
+    const { identity } = body;
+
+    if (!identity) {
+      return c.json({ error: "identity is required" }, 400);
+    }
+
+    // Find charger UUID from team chargers
+    if (!cachedTeamUuid) {
+      const teamsRes = await plugchoiceFetch("GET", "/teams");
+      const teams = teamsRes.data || [];
+      if (teams.length === 0) {
+        return c.json({ error: "No teams found" }, 404);
+      }
+      cachedTeamUuid = teams[0].uuid;
+    }
+
+    const teamChargers = await plugchoiceFetchAllPages(`/teams/${cachedTeamUuid}/chargers`);
+    const charger = teamChargers.find((ch: any) => ch.identity === identity);
+    if (!charger) {
+      return c.json({ error: `Charger with identity '${identity}' not found in team` }, 404);
+    }
+
+    // Get pincode from charger detail
+    const chargerDetail = await plugchoiceFetch("GET", `/chargers/${charger.uuid}`);
+    const pincode = chargerDetail.data.pincode;
+
+    // Attach charger to site
+    const result = await plugchoiceFetch("POST", `/sites/${siteUuid}/chargers`, {
+      identity,
+      pincode,
+    });
+    return c.json(result);
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured") {
+      return c.json({ error: err.message }, 401);
+    }
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Batch attach multiple chargers to a site
+api.post("/plugchoice/sites/:uuid/chargers/batch", async (c) => {
+  try {
+    const siteUuid = c.req.param("uuid");
+    const body = await c.req.json();
+    const { identities } = body;
+
+    if (!identities || !Array.isArray(identities) || identities.length === 0) {
+      return c.json({ error: "identities array is required" }, 400);
+    }
+
+    // Ensure team UUID is cached
+    if (!cachedTeamUuid) {
+      const teamsRes = await plugchoiceFetch("GET", "/teams");
+      const teams = teamsRes.data || [];
+      if (teams.length === 0) {
+        return c.json({ error: "No teams found" }, 404);
+      }
+      cachedTeamUuid = teams[0].uuid;
+    }
+
+    // Fetch all team chargers once
+    const teamChargers = await plugchoiceFetchAllPages(`/teams/${cachedTeamUuid}/chargers`);
+
+    const results: { identity: string; success: boolean; error?: string }[] = [];
+
+    for (const identity of identities) {
+      try {
+        const charger = teamChargers.find((ch: any) => ch.identity === identity);
+        if (!charger) {
+          results.push({ identity, success: false, error: `Charger not found in team` });
+          continue;
+        }
+
+        // Get pincode from charger detail
+        const chargerDetail = await plugchoiceFetch("GET", `/chargers/${charger.uuid}`);
+        const pincode = chargerDetail.data.pincode;
+
+        // Attach charger to site
+        await plugchoiceFetch("POST", `/sites/${siteUuid}/chargers`, {
+          identity,
+          pincode,
+        });
+
+        results.push({ identity, success: true });
+      } catch (err: any) {
+        results.push({ identity, success: false, error: err.message });
+      }
+    }
+
+    return c.json({ results });
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured") {
+      return c.json({ error: err.message }, 401);
+    }
+    return c.json({ error: err.message }, 500);
+  }
 });
 
 // Mount API

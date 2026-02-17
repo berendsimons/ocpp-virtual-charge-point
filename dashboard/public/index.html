@@ -362,6 +362,11 @@
             Chargers
             <span class="nav-item-badge" id="chargerCountBadge">0</span>
           </div>
+          <div class="nav-item" onclick="showPage('locations')">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            Locations
+            <span class="nav-item-badge" id="locationCountBadge">0</span>
+          </div>
           <div class="nav-item" onclick="showPage('models')">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
             Models
@@ -434,6 +439,11 @@
                   Disconnect
                 </div>
                 <div class="dropdown-divider"></div>
+                <div class="dropdown-item" onclick="bulkAction('attachLocation')">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  Attach to Location
+                </div>
+                <div class="dropdown-divider"></div>
                 <div class="dropdown-item" onclick="bulkAction('exportCsv')">
                   <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                   Export CSV
@@ -502,6 +512,11 @@
                 <option value="Unavailable">Unavailable</option>
                 <option value="Faulted">Faulted</option>
               </select>
+              <select class="form-select" id="filterLocation" onchange="filterChargers()">
+                <option value="">All Locations</option>
+                <option value="attached">Has location</option>
+                <option value="unattached">No location</option>
+              </select>
               <button class="btn btn-sm btn-secondary" onclick="resetFilters()">Reset</button>
               <span class="filter-count" id="filterCount"></span>
             </div>
@@ -520,7 +535,7 @@
                     </div>
                   </div>
                 </th>
-                <th>Chargepoint ID</th><th>Conn. 0</th><th>Conn. 1</th><th>Conn. 2</th><th>Vendor</th><th>Model</th><th>Install</th>
+                <th>Chargepoint ID</th><th>Location</th><th>Conn. 0</th><th>Conn. 1</th><th>Conn. 2</th><th>Vendor</th><th>Model</th><th>Install</th>
               </tr></thead>
               <tbody id="chargersTableBody"></tbody>
             </table>
@@ -586,6 +601,53 @@
         </div>
       </div>
 
+      <!-- Locations Page -->
+      <div id="page-locations" class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Locations</h1>
+            <p class="page-subtitle">Manage Plugchoice sites</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-secondary" onclick="showGenerateLocationsModal()">
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+              Generate Locations
+            </button>
+            <button class="btn btn-primary" onclick="loadLocations()">
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+        <div class="page-content">
+          <div id="locationsTokenWarning" style="display:none; padding: 20px; background: var(--accent-orange-light); border: 1px solid var(--accent-orange); border-radius: var(--radius-md); margin-bottom: 20px; font-size: 14px;">
+            No Plugchoice API token configured. Go to <a href="#" onclick="showPage('settings'); return false;" style="color: var(--accent-blue); font-weight: 600;">Settings</a> to add your token.
+          </div>
+          <div class="table-container">
+            <div class="table-toolbar">
+              <div class="table-toolbar-left">
+                <div class="table-search">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  <input type="text" placeholder="Search locations..." id="locationSearchInput" oninput="renderLocations()">
+                </div>
+              </div>
+              <span class="filter-count" id="locationFilterCount"></span>
+            </div>
+            <table>
+              <thead><tr>
+                <th>Name</th><th>Street</th><th>Nr</th><th>Postal Code</th><th>City</th><th>Chargers</th><th style="width:80px;">Actions</th>
+              </tr></thead>
+              <tbody id="locationsTableBody"></tbody>
+            </table>
+            <div class="table-empty" id="locationsTableEmpty" style="display: none;">
+              <div class="table-empty-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg></div>
+              <h3>No locations yet</h3>
+              <p>Generate locations or configure your Plugchoice API token</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Settings Page -->
       <div id="page-settings" class="page">
         <div class="page-header">
@@ -607,6 +669,22 @@
                   <input type="text" class="form-input" id="wsUrlInput" placeholder="ws://localhost:3000" style="flex: 1;">
                   <button class="btn btn-primary" onclick="saveWsUrl()">Save</button>
                 </div>
+              </div>
+            </div>
+          </div>
+          <div class="settings-section">
+            <div class="settings-section-header">
+              <h2 class="settings-section-title">Plugchoice API</h2>
+              <p class="settings-section-desc">Connect to the Plugchoice platform to manage locations and charger assignments</p>
+            </div>
+            <div class="settings-section-body">
+              <div class="form-group">
+                <label class="form-label">API Token</label>
+                <div style="display: flex; gap: 12px;">
+                  <input type="password" class="form-input" id="plugchoiceTokenInput" placeholder="Paste your Plugchoice API token..." style="flex: 1;">
+                  <button class="btn btn-primary" onclick="savePlugchoiceToken()">Save</button>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;" id="plugchoiceTokenStatus">Checking...</p>
               </div>
             </div>
           </div>
@@ -858,6 +936,55 @@
     </div>
   </div>
 
+  <!-- Attach to Location Modal -->
+  <div class="modal-overlay" id="attachLocationModal">
+    <div class="modal">
+      <div class="modal-header"><h3 class="modal-title">Attach to Location</h3></div>
+      <div class="modal-body">
+        <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 16px;">Attach <strong id="attachLocationCount">0</strong> selected charger(s) to a location.</p>
+        <div class="form-group">
+          <label class="form-label">Location</label>
+          <select class="form-select" id="attachLocationSelect">
+            <option value="_random">Assign to random locations</option>
+          </select>
+        </div>
+        <div id="attachLocationProgress" style="display:none; margin-top: 16px;">
+          <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;" id="attachLocationProgressText">Attaching...</div>
+          <div style="width: 100%; height: 6px; background: var(--border-light); border-radius: 3px; overflow: hidden;">
+            <div id="attachLocationProgressBar" style="width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; border-radius: 3px;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeAttachLocationModal()">Cancel</button>
+        <button class="btn btn-primary" id="attachLocationBtn" onclick="executeAttachLocation()">Attach</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generate Locations Modal -->
+  <div class="modal-overlay" id="generateLocationsModal">
+    <div class="modal">
+      <div class="modal-header"><h3 class="modal-title">Generate Locations</h3></div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Number of locations</label>
+          <input type="number" class="form-input" id="generateLocationsCount" value="10" min="1" max="100">
+        </div>
+        <div id="genLocProgress" style="display:none; margin-top: 16px;">
+          <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;" id="genLocProgressText">Generating...</div>
+          <div style="width: 100%; height: 6px; background: var(--border-light); border-radius: 3px; overflow: hidden;">
+            <div id="genLocProgressBar" style="width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; border-radius: 3px;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeGenerateLocationsModal()">Cancel</button>
+        <button class="btn btn-primary" id="genLocBtn" onclick="executeGenerateLocations()">Generate</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const API_BASE = '/api';
     let chargers = [];
@@ -901,6 +1028,9 @@
     let models = JSON.parse(localStorage.getItem('chargerModels')) || [...defaultModels];
     let carProfiles = [];
     let plugCarTarget = null; // { cpId, connectorId }
+    let plugchoiceSites = []; // cached sites from Plugchoice
+    let chargerSiteMap = {}; // identity -> { siteName, siteUuid }
+    let hasPlugchoiceToken = false;
 
     // Init
     document.addEventListener('DOMContentLoaded', () => {
@@ -908,6 +1038,7 @@
       loadCarProfiles();
       renderModels();
       populateModelSelects();
+      checkPlugchoiceToken();
       refreshInterval = setInterval(loadChargers, 5000);
       document.addEventListener('click', (e) => {
         if (!e.target.closest('.dropdown')) document.getElementById('actionsDropdown').classList.remove('show');
@@ -969,6 +1100,7 @@
       const connCount = document.getElementById('filterConnectors').value;
       const connection = document.getElementById('filterConnection').value;
       const connStatus = document.getElementById('filterConnectorStatus').value;
+      const locFilter = document.getElementById('filterLocation').value;
       return chargers.filter(c => {
         if (search && !c.cpId.toLowerCase().includes(search)) return false;
         if (vendor && c.config.vendor !== vendor) return false;
@@ -978,6 +1110,8 @@
         if (connection === 'connected' && !c.connected) return false;
         if (connection === 'disconnected' && c.connected) return false;
         if (connStatus && !c.connectors.some(cn => cn.status === connStatus)) return false;
+        if (locFilter === 'attached' && !chargerSiteMap[c.cpId]) return false;
+        if (locFilter === 'unattached' && chargerSiteMap[c.cpId]) return false;
         return true;
       });
     }
@@ -1008,7 +1142,9 @@
           if (!charger.connected) return `<span class="status-badge offline"><span class="status-badge-dot"></span>${conn.status}</span>${evTag}`;
           return `<span class="status-badge ${conn.status}"><span class="status-badge-dot"></span>${conn.status}</span>${evTag}`;
         };
-        return `<tr><td class="checkbox-cell" onclick="event.stopPropagation();"><input type="checkbox" ${selectedChargers.has(charger.cpId) ? 'checked' : ''} onchange="toggleSelection('${charger.cpId}')"></td><td class="charger-id-cell copyable" onclick="copyToClipboard('${charger.cpId}', event)" title="Click to copy">${charger.cpId}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(0)}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(1)}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(2)}</td><td onclick="openChargerPanel('${charger.cpId}')">${charger.config.vendor}</td><td onclick="openChargerPanel('${charger.cpId}')">${charger.config.model}</td><td onclick="openChargerPanel('${charger.cpId}')">${(charger.config.phases || 3) === 1 ? '1ph' : '3ph'}</td></tr>`;
+        const siteInfo = chargerSiteMap[charger.cpId];
+        const locCell = siteInfo ? `<span style="font-size:13px;">${siteInfo.siteName}</span>` : '<span class="text-muted">-</span>';
+        return `<tr><td class="checkbox-cell" onclick="event.stopPropagation();"><input type="checkbox" ${selectedChargers.has(charger.cpId) ? 'checked' : ''} onchange="toggleSelection('${charger.cpId}')"></td><td class="charger-id-cell copyable" onclick="copyToClipboard('${charger.cpId}', event)" title="Click to copy">${charger.cpId}</td><td onclick="openChargerPanel('${charger.cpId}')">${locCell}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(0)}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(1)}</td><td onclick="openChargerPanel('${charger.cpId}')">${getConnectorStatus(2)}</td><td onclick="openChargerPanel('${charger.cpId}')">${charger.config.vendor}</td><td onclick="openChargerPanel('${charger.cpId}')">${charger.config.model}</td><td onclick="openChargerPanel('${charger.cpId}')">${(charger.config.phases || 3) === 1 ? '1ph' : '3ph'}</td></tr>`;
       }).join('');
     }
 
@@ -1043,6 +1179,7 @@
       document.getElementById('filterConnectors').value = '';
       document.getElementById('filterConnection').value = '';
       document.getElementById('filterConnectorStatus').value = '';
+      document.getElementById('filterLocation').value = '';
       filterChargers();
     }
     function toggleSelectPctPopover() {
@@ -1072,6 +1209,7 @@
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
       document.getElementById(`page-${page}`).classList.add('active');
       document.querySelector(`.nav-item[onclick="showPage('${page}')"]`).classList.add('active');
+      if (page === 'locations') loadLocations();
     }
 
     // Actions
@@ -1087,6 +1225,7 @@
         case 'changeConfiguration': document.getElementById('configCount').textContent = selectedChargers.size; document.getElementById('configModal').classList.add('show'); break;
         case 'connect': bulkConnect(); break;
         case 'disconnect': bulkDisconnect(); break;
+        case 'attachLocation': showAttachLocationModal(); break;
         case 'exportCsv': exportSelectedCsv(); break;
         case 'exportIds': exportSelectedIds(); break;
         case 'delete': bulkDelete(); break;
@@ -1132,11 +1271,12 @@
 
     function exportSelectedCsv() {
       const selected = chargers.filter(c => selectedChargers.has(c.cpId));
-      const headers = ['Chargepoint ID', 'Conn. 0', 'Conn. 1', 'Conn. 2', 'Vendor', 'Model', 'Install'];
+      const headers = ['Chargepoint ID', 'Location', 'Conn. 0', 'Conn. 1', 'Conn. 2', 'Vendor', 'Model', 'Install'];
       const rows = selected.map(c => {
         const connStatus = (idx) => { const conn = c.connectors.find(cn => cn.connectorId === idx); return conn ? conn.status : ''; };
         const install = (c.config.phases || 3) === 1 ? '1ph' : '3ph';
-        return [c.cpId, connStatus(0), connStatus(1), connStatus(2), c.config.vendor, c.config.model, install].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+        const loc = chargerSiteMap[c.cpId]?.siteName || '';
+        return [c.cpId, loc, connStatus(0), connStatus(1), connStatus(2), c.config.vendor, c.config.model, install].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
       });
       downloadCsv([headers.join(','), ...rows].join('\n'), 'chargers.csv');
       showToast(`Exported ${selected.length} charger(s) to CSV`, 'success');
@@ -1587,6 +1727,209 @@
 
     // Toast
     function showToast(message, type = 'success') { const existing = document.querySelector('.toast'); if (existing) existing.remove(); const toast = document.createElement('div'); toast.className = `toast ${type}`; const icon = type === 'success' ? '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>' : '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>'; toast.innerHTML = icon + message; document.body.appendChild(toast); setTimeout(() => toast.remove(), 3000); }
+
+    // ========== PLUGCHOICE INTEGRATION ==========
+    async function checkPlugchoiceToken() {
+      try {
+        const resp = await api('/plugchoice/token');
+        hasPlugchoiceToken = resp.hasToken;
+        document.getElementById('plugchoiceTokenStatus').textContent = hasPlugchoiceToken ? 'Token configured' : 'No token set';
+        document.getElementById('plugchoiceTokenStatus').style.color = hasPlugchoiceToken ? 'var(--accent-green-dark)' : 'var(--text-muted)';
+        if (hasPlugchoiceToken) loadChargerSiteMap();
+      } catch(e) { hasPlugchoiceToken = false; }
+    }
+
+    async function savePlugchoiceToken() {
+      const token = document.getElementById('plugchoiceTokenInput').value.trim();
+      if (!token) { showToast('Please enter a token', 'error'); return; }
+      await api('/plugchoice/token', { method: 'POST', body: JSON.stringify({ token }) });
+      document.getElementById('plugchoiceTokenInput').value = '';
+      showToast('Plugchoice token saved', 'success');
+      checkPlugchoiceToken();
+    }
+
+    async function loadChargerSiteMap() {
+      try {
+        const teamChargers = await api('/plugchoice/team-chargers');
+        chargerSiteMap = {};
+        teamChargers.forEach(tc => {
+          if (tc.site) {
+            chargerSiteMap[tc.identity] = { siteName: tc.site.name, siteUuid: tc.site.uuid };
+          }
+        });
+        renderTable();
+      } catch(e) { console.log('Could not load Plugchoice charger map:', e); }
+    }
+
+    // ===== LOCATIONS PAGE =====
+    async function loadLocations() {
+      if (!hasPlugchoiceToken) {
+        document.getElementById('locationsTokenWarning').style.display = 'block';
+        document.getElementById('locationsTableBody').innerHTML = '';
+        document.getElementById('locationsTableEmpty').style.display = 'block';
+        return;
+      }
+      document.getElementById('locationsTokenWarning').style.display = 'none';
+      try {
+        plugchoiceSites = await api('/plugchoice/sites');
+        document.getElementById('locationCountBadge').textContent = plugchoiceSites.length;
+        renderLocations();
+      } catch(e) { showToast('Failed to load locations', 'error'); }
+    }
+
+    function renderLocations() {
+      const tbody = document.getElementById('locationsTableBody');
+      const empty = document.getElementById('locationsTableEmpty');
+      const search = document.getElementById('locationSearchInput').value.toLowerCase();
+      const filtered = plugchoiceSites.filter(s => !search || s.name.toLowerCase().includes(search) || (s.city||'').toLowerCase().includes(search) || (s.street||'').toLowerCase().includes(search));
+      document.getElementById('locationFilterCount').textContent = `${filtered.length} / ${plugchoiceSites.length} locations`;
+      if (filtered.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+      empty.style.display = 'none';
+      tbody.innerHTML = filtered.map(s => `<tr>
+        <td style="font-weight:600;">${s.name}</td>
+        <td>${s.street || '-'}</td>
+        <td>${s.house_number || '-'}</td>
+        <td>${s.postal_code || '-'}</td>
+        <td>${s.city || '-'}</td>
+        <td>${s.chargers_count || 0}</td>
+        <td><button class="action-btn" onclick="event.stopPropagation(); deleteLocation('${s.uuid}', '${s.name.replace(/'/g, "\\'")}')">Delete</button></td>
+      </tr>`).join('');
+    }
+
+    async function deleteLocation(uuid, name) {
+      if (!confirm(`Delete location "${name}"?`)) return;
+      try {
+        await api(`/plugchoice/sites/${uuid}`, { method: 'DELETE' });
+        showToast(`Deleted ${name}`, 'success');
+        loadLocations();
+      } catch(e) { showToast('Failed to delete location', 'error'); }
+    }
+
+    // ===== GENERATE LOCATIONS =====
+    function showGenerateLocationsModal() {
+      if (!hasPlugchoiceToken) { showToast('Configure Plugchoice token in Settings first', 'error'); return; }
+      document.getElementById('generateLocationsModal').classList.add('show');
+      document.getElementById('genLocProgress').style.display = 'none';
+      document.getElementById('genLocBtn').disabled = false;
+    }
+    function closeGenerateLocationsModal() { document.getElementById('generateLocationsModal').classList.remove('show'); }
+
+    function generateRandomLocation() {
+      const prefixes = ['AURA','BOLT','CARS','FARO','GARA','INST','KITE','LUMA','MINT','NOVA','OVAL','PILO','RIVR','SOLA','TIDE','VIVA','APEX','FLUX','GRID','VOLT','WAVE','ZEST','PEAK','CORE','DOME','EDGE','HIVE','LYNX','NEON','RUBY'];
+      const surnames = ['Bakker','Visser','Meijer','De Vries','Jansen','Peters','Hendriks','De Boer','Dekker','Mulder','Schouten','Van Dijk','Van den Berg','Van der Wal','Van der Linden','Verhoeven','Kramer','Van Leeuwen','Vos','Van Dam','Van Vliet','De Groot','Smit','Brouwer','Van der Heijden','Kuijpers','Willems','Bos','Van der Meer','Vermeer'];
+      const streetParts1 = ['Akker','Baan','Beuken','Bos','Eiken','Erasmus','Haven','Heuvel','Hoek','Juliana','Kade','Kastanje','Kerk','Konings','Koren','Linde','Markt','Molen','Ooster','Prinsen','Rembrandt','School','Singel','Spui','Veld','Vondel','Wald','Weide','Wester','Zilver','Dam','Dijk','Park','Rijn','Maas','Waal'];
+      const streetParts2 = ['hof','laan','dreef','singel','plantsoen','park','straat','weg','gracht','kade','pad','steeg','plein','boulevard'];
+      const useTwoParts = Math.random() > 0.4;
+      const street = useTwoParts ? streetParts1[Math.floor(Math.random()*streetParts1.length)] + ' ' + streetParts2[Math.floor(Math.random()*streetParts2.length)] : streetParts1[Math.floor(Math.random()*streetParts1.length)] + streetParts2[Math.floor(Math.random()*streetParts2.length)];
+      const houseNum = Math.floor(Math.random() * 180) + 1;
+      // Cities with weighted distribution (more Randstad)
+      const cities = [
+        {city:'Amsterdam',pc:'10'},{city:'Amsterdam',pc:'10'},{city:'Amsterdam',pc:'10'},
+        {city:'Rotterdam',pc:'30'},{city:'Rotterdam',pc:'30'},
+        {city:'Den Haag',pc:'25'},{city:'Den Haag',pc:'25'},
+        {city:'Utrecht',pc:'35'},{city:'Utrecht',pc:'35'},{city:'Utrecht',pc:'35'},
+        {city:'Haarlem',pc:'20'},{city:'Delft',pc:'26'},
+        {city:'Leiden',pc:'23'},{city:'Zoetermeer',pc:'27'},
+        {city:'Hoofddorp',pc:'21'},{city:'Almere',pc:'13'},
+        {city:'Zaandam',pc:'15'},{city:'Gouda',pc:'28'},
+        {city:'Tilburg',pc:'50'},{city:'Den Bosch',pc:'52'},
+        {city:'Eindhoven',pc:'56'},{city:'Helmond',pc:'57'},
+        {city:'Breda',pc:'48'},{city:'Middelburg',pc:'43'},
+        {city:'Vlissingen',pc:'43'},{city:'Apeldoorn',pc:'73'},
+        {city:'Deventer',pc:'74'},{city:'Enschede',pc:'75'},
+        {city:'Groningen',pc:'97'},{city:'Leeuwarden',pc:'89'},
+        {city:'Emmen',pc:'78'},{city:'Sittard',pc:'61'},
+        {city:'Heerlen',pc:'64'},{city:'Maastricht',pc:'62'},
+        {city:'Alkmaar',pc:'18'},{city:'Arnhem',pc:'68'},
+      ];
+      const cityObj = cities[Math.floor(Math.random()*cities.length)];
+      const pcNum = parseInt(cityObj.pc) * 100 + Math.floor(Math.random()*99) + 1;
+      const pcLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const postalCode = `${pcNum} ${pcLetters[Math.floor(Math.random()*26)]}${pcLetters[Math.floor(Math.random()*26)]}`;
+      const prefix = prefixes[Math.floor(Math.random()*prefixes.length)];
+      const projNum = String(Math.floor(Math.random()*10000)).padStart(4,'0');
+      const surname = surnames[Math.floor(Math.random()*surnames.length)];
+      const name = `${prefix}-${projNum}-${surname}`;
+      return { name, street, house_number: houseNum, postal_code: postalCode, city: cityObj.city, country: 'NL' };
+    }
+
+    async function executeGenerateLocations() {
+      const count = parseInt(document.getElementById('generateLocationsCount').value) || 10;
+      document.getElementById('genLocProgress').style.display = 'block';
+      document.getElementById('genLocBtn').disabled = true;
+      let success = 0;
+      for (let i = 0; i < count; i++) {
+        const loc = generateRandomLocation();
+        try {
+          await api('/plugchoice/sites', { method: 'POST', body: JSON.stringify(loc) });
+          success++;
+        } catch(e) { console.error('Failed to create location:', e); }
+        const pct = Math.round(((i+1)/count)*100);
+        document.getElementById('genLocProgressBar').style.width = pct + '%';
+        document.getElementById('genLocProgressText').textContent = `Creating... ${i+1}/${count}`;
+      }
+      document.getElementById('genLocBtn').disabled = false;
+      showToast(`Created ${success} location(s)`, 'success');
+      closeGenerateLocationsModal();
+      loadLocations();
+    }
+
+    // ===== ATTACH TO LOCATION =====
+    async function showAttachLocationModal() {
+      if (!hasPlugchoiceToken) { showToast('Configure Plugchoice token in Settings first', 'error'); return; }
+      document.getElementById('attachLocationCount').textContent = selectedChargers.size;
+      document.getElementById('attachLocationProgress').style.display = 'none';
+      document.getElementById('attachLocationBtn').disabled = false;
+      // Populate location dropdown
+      if (plugchoiceSites.length === 0) {
+        try { plugchoiceSites = await api('/plugchoice/sites'); } catch(e) {}
+      }
+      const sel = document.getElementById('attachLocationSelect');
+      sel.innerHTML = '<option value="_random">Assign to random locations</option>' +
+        plugchoiceSites.map(s => `<option value="${s.uuid}">${s.name} - ${s.city}</option>`).join('');
+      document.getElementById('attachLocationModal').classList.add('show');
+    }
+    function closeAttachLocationModal() { document.getElementById('attachLocationModal').classList.remove('show'); }
+
+    async function executeAttachLocation() {
+      const siteUuid = document.getElementById('attachLocationSelect').value;
+      const identities = [...selectedChargers];
+      document.getElementById('attachLocationProgress').style.display = 'block';
+      document.getElementById('attachLocationBtn').disabled = true;
+      let success = 0, fail = 0;
+      if (siteUuid === '_random') {
+        // Assign each charger to a random site
+        const availableSites = plugchoiceSites.length > 0 ? plugchoiceSites : [];
+        if (availableSites.length === 0) { showToast('No locations available', 'error'); return; }
+        for (let i = 0; i < identities.length; i++) {
+          const site = availableSites[Math.floor(Math.random() * availableSites.length)];
+          try {
+            const resp = await api(`/plugchoice/sites/${site.uuid}/chargers`, { method: 'POST', body: JSON.stringify({ identity: identities[i] }) });
+            if (resp.error) { fail++; } else { success++; }
+          } catch(e) { fail++; }
+          const pct = Math.round(((i+1)/identities.length)*100);
+          document.getElementById('attachLocationProgressBar').style.width = pct + '%';
+          document.getElementById('attachLocationProgressText').textContent = `Attaching... ${i+1}/${identities.length}`;
+        }
+      } else {
+        // Assign all to one specific site
+        for (let i = 0; i < identities.length; i++) {
+          try {
+            const resp = await api(`/plugchoice/sites/${siteUuid}/chargers`, { method: 'POST', body: JSON.stringify({ identity: identities[i] }) });
+            if (resp.error) { fail++; } else { success++; }
+          } catch(e) { fail++; }
+          const pct = Math.round(((i+1)/identities.length)*100);
+          document.getElementById('attachLocationProgressBar').style.width = pct + '%';
+          document.getElementById('attachLocationProgressText').textContent = `Attaching... ${i+1}/${identities.length}`;
+        }
+      }
+      document.getElementById('attachLocationBtn').disabled = false;
+      showToast(`Attached ${success} charger(s)${fail > 0 ? `, ${fail} failed` : ''}`, success > 0 ? 'success' : 'error');
+      closeAttachLocationModal();
+      loadChargerSiteMap();
+      loadLocations();
+    }
+
   </script>
 </body>
 </html>

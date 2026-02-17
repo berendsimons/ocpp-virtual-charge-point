@@ -135,3 +135,6 @@ dist
 
 # Claude Code
 CLAUDE.md
+
+# Plugchoice API token
+dashboard/plugchoice.json

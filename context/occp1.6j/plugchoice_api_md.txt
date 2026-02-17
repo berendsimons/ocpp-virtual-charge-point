@@ -1,0 +1,90 @@
+# Plugchoice
+
+## Docs
+
+- [Authentication](https://developer.volttime.com/api-reference/authentication.md): We use OAuth 2.0 to authenticate and authorize access to our API. This documentation will guide you through the authentication process.
+- [Create charger](https://developer.volttime.com/api-reference/chargers/create-charger.md)
+- [Delete charger](https://developer.volttime.com/api-reference/chargers/delete-charger.md)
+- [Get charger](https://developer.volttime.com/api-reference/chargers/get-charger.md)
+- [Get transaction graph data](https://developer.volttime.com/api-reference/chargers/get-transaction-graph-data.md): Get energy, current, and voltage graph data for a specific transaction. Data points are sampled to a maximum of 200 points.
+- [List chargers](https://developer.volttime.com/api-reference/chargers/list-chargers.md)
+- [List transactions](https://developer.volttime.com/api-reference/chargers/list-transactions.md)
+- [Setup charger](https://developer.volttime.com/api-reference/chargers/setup-charger.md): Configure initial settings for a charger including phases, current limits, and other configuration. The charger will automatically restart after successful setup.
+- [Update charger](https://developer.volttime.com/api-reference/chargers/update-charger.md)
+- [Restart charger](https://developer.volttime.com/api-reference/chargers:-actions/restart-charger.md)
+- [Set charging limit](https://developer.volttime.com/api-reference/chargers:-actions/set-charging-limit.md): Sets the charging current limit for a specific connector. The limit is specified in Amperes (A).
+- [Start transaction](https://developer.volttime.com/api-reference/chargers:-actions/start-transaction.md)
+- [Stop transaction](https://developer.volttime.com/api-reference/chargers:-actions/stop-transaction.md)
+- [Get current usage](https://developer.volttime.com/api-reference/chargers:-connectors/get-current-usage.md)
+- [Get latest meter value](https://developer.volttime.com/api-reference/chargers:-connectors/get-latest-meter-value.md)
+- [List historical meter values](https://developer.volttime.com/api-reference/chargers:-connectors/list-historical-meter-values.md): Get the meter values for the specific charger
+- [Update connector](https://developer.volttime.com/api-reference/chargers:-connectors/update-connector.md): Updates the phase rotation and max amperage for a connector.
+- [Create Payment Intent](https://developer.volttime.com/api-reference/chargers:-licenses/create-payment-intent.md)
+- [List charger logs](https://developer.volttime.com/api-reference/chargers:-logs/list-charger-logs.md): Get OCPP communication logs for a charger
+- [Get proxy servers](https://developer.volttime.com/api-reference/chargers:-proxy/get-proxy-servers.md): Get the proxy servers for the specific charger
+- [Update proxy servers](https://developer.volttime.com/api-reference/chargers:-proxy/update-proxy-servers.md): Update the proxy servers for the specific charger
+- [Get lock status](https://developer.volttime.com/api-reference/chargers:-settings/get-lock-status.md): Get the Lock status for a charger
+- [Get plug & charge status](https://developer.volttime.com/api-reference/chargers:-settings/get-plug-&-charge-status.md): Get the Plug & Charge status for a charger
+- [Update lock status](https://developer.volttime.com/api-reference/chargers:-settings/update-lock-status.md): Update the Lock for a charger
+- [Update plug & charge](https://developer.volttime.com/api-reference/chargers:-settings/update-plug-&-charge.md): Update the Plug & Charge status for a charger
+- [Find a meter by Chargee ID or Serial Number](https://developer.volttime.com/api-reference/meters/find-a-meter-by-chargee-id-or-serial-number.md): Finds a meter by Chargee ID (temp_chargee_id) or serial number.
+The identifier is matched against both fields for backwards compatibility.
+- [List products](https://developer.volttime.com/api-reference/products/list-products.md): Get a list of all products
+- [List providers](https://developer.volttime.com/api-reference/providers/list-providers.md)
+- [Search chargers and locations](https://developer.volttime.com/api-reference/search/search-chargers-and-locations.md)
+- [Create site](https://developer.volttime.com/api-reference/sites/create-site.md)
+- [Delete site](https://developer.volttime.com/api-reference/sites/delete-site.md)
+- [Get site](https://developer.volttime.com/api-reference/sites/get-site.md)
+- [List sites](https://developer.volttime.com/api-reference/sites/list-sites.md)
+- [List transactions](https://developer.volttime.com/api-reference/sites/list-transactions.md)
+- [Update site](https://developer.volttime.com/api-reference/sites/update-site.md)
+- [Add card via reader](https://developer.volttime.com/api-reference/sites:-access-cards/add-card-via-reader.md): Activates the card reader flow. The next card scanned at a charger within this site will be automatically added to the site.
+- [Create card](https://developer.volttime.com/api-reference/sites:-access-cards/create-card.md)
+- [Delete card](https://developer.volttime.com/api-reference/sites:-access-cards/delete-card.md)
+- [Import cards](https://developer.volttime.com/api-reference/sites:-access-cards/import-cards.md): Import multiple cards from a CSV file. The CSV should have columns: name, id_token
+- [List cards](https://developer.volttime.com/api-reference/sites:-access-cards/list-cards.md)
+- [Update card](https://developer.volttime.com/api-reference/sites:-access-cards/update-card.md)
+- [Attach charger](https://developer.volttime.com/api-reference/sites:-chargers/attach-charger.md)
+- [Detach charger](https://developer.volttime.com/api-reference/sites:-chargers/detach-charger.md)
+- [List chargers](https://developer.volttime.com/api-reference/sites:-chargers/list-chargers.md)
+- [Reassign charger](https://developer.volttime.com/api-reference/sites:-chargers/reassign-charger.md): Moves a charger to a different group within the same site.
+- [List connectors](https://developer.volttime.com/api-reference/sites:-connectors/list-connectors.md)
+- [Assign chargers](https://developer.volttime.com/api-reference/sites:-groups/assign-chargers.md): Assigns multiple chargers to the specified group.
+- [Create a subgroup](https://developer.volttime.com/api-reference/sites:-groups/create-a-subgroup.md): Creates a new subgroup under an existing group.
+- [Create group](https://developer.volttime.com/api-reference/sites:-groups/create-group.md): Creates a new group for the specified site. If a group already exists, it will be deleted and replaced with the new one.
+- [Delete all groups](https://developer.volttime.com/api-reference/sites:-groups/delete-all-groups.md): Deletes all groups for the specified site.
+- [Delete group](https://developer.volttime.com/api-reference/sites:-groups/delete-group.md): Deletes a single group for the specified site.
+- [Get group meter usage](https://developer.volttime.com/api-reference/sites:-groups/get-group-meter-usage.md)
+- [Get power history](https://developer.volttime.com/api-reference/sites:-groups/get-power-history.md): Get historical power metrics for branches or connectors
+- [List groups](https://developer.volttime.com/api-reference/sites:-groups/list-groups.md)
+- [Reassign group](https://developer.volttime.com/api-reference/sites:-groups/reassign-group.md): Moves a group to a different parent group.
+- [Update group](https://developer.volttime.com/api-reference/sites:-groups/update-group.md)
+- [Get power management data](https://developer.volttime.com/api-reference/sites:-power-management/get-power-management-data.md): Returns load management groups, chargers, and real-time metrics
+- [Get settings](https://developer.volttime.com/api-reference/sites:-smart-charging/get-settings.md)
+- [Update settings](https://developer.volttime.com/api-reference/sites:-smart-charging/update-settings.md)
+- [Accept invite](https://developer.volttime.com/api-reference/sites:-team-access/accept-invite.md)
+- [Cancel invite](https://developer.volttime.com/api-reference/sites:-team-access/cancel-invite.md)
+- [Create invite](https://developer.volttime.com/api-reference/sites:-team-access/create-invite.md)
+- [Get team access](https://developer.volttime.com/api-reference/sites:-team-access/get-team-access.md)
+- [Grant sensitive access](https://developer.volttime.com/api-reference/sites:-team-access/grant-sensitive-access.md)
+- [Join via charger credentials](https://developer.volttime.com/api-reference/sites:-team-access/join-via-charger-credentials.md)
+- [List teams](https://developer.volttime.com/api-reference/sites:-team-access/list-teams.md)
+- [Modify asset access](https://developer.volttime.com/api-reference/sites:-team-access/modify-asset-access.md)
+- [Remove team](https://developer.volttime.com/api-reference/sites:-team-access/remove-team.md)
+- [Request sensitive access](https://developer.volttime.com/api-reference/sites:-team-access/request-sensitive-access.md)
+- [Revoke sensitive access](https://developer.volttime.com/api-reference/sites:-team-access/revoke-sensitive-access.md)
+- [Transfer ownership](https://developer.volttime.com/api-reference/sites:-team-access/transfer-ownership.md)
+- [List tariffs](https://developer.volttime.com/api-reference/tariffs/list-tariffs.md): Get a list of tariffs for a specific location
+- [Create team](https://developer.volttime.com/api-reference/teams/create-team.md)
+- [Delete team](https://developer.volttime.com/api-reference/teams/delete-team.md)
+- [List teams](https://developer.volttime.com/api-reference/teams/list-teams.md)
+- [Import chargers from CSV](https://developer.volttime.com/api-reference/teams:-chargers/import-chargers-from-csv.md): The CSV should contain one Chargepoint ID (identity) per row.
+An optional header row is automatically detected and skipped.
+- [List chargers](https://developer.volttime.com/api-reference/teams:-chargers/list-chargers.md)
+- [Add domain](https://developer.volttime.com/api-reference/teams:-domains/add-domain.md)
+- [Remove domain](https://developer.volttime.com/api-reference/teams:-domains/remove-domain.md)
+- [Verify domain](https://developer.volttime.com/api-reference/teams:-domains/verify-domain.md)
+- [List sites](https://developer.volttime.com/api-reference/teams:-sites/list-sites.md)
+- [Delete user account](https://developer.volttime.com/api-reference/user/delete-user-account.md): Sends an email to the user with a link to delete their account.
+- [Get user details](https://developer.volttime.com/api-reference/user/get-user-details.md)
+- [Introduction](https://developer.volttime.com/introduction.md): Welcome to the documentation for Plugchoice. Here you will find all the information you need to integrate with our API.
