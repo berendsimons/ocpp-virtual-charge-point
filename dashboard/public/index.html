@@ -960,9 +960,14 @@
         <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 16px;">Attach <strong id="attachLocationCount">0</strong> selected charger(s) to a location.</p>
         <div class="form-group">
           <label class="form-label">Location</label>
-          <select class="form-select" id="attachLocationSelect">
-            <option value="_random">Assign to random locations</option>
-          </select>
+          <div style="position: relative;" id="attachLocSearchWrap">
+            <input type="text" class="form-input" id="attachLocSearchInput" placeholder="Search locations..." autocomplete="off"
+              oninput="filterAttachLocList()" onfocus="showAttachLocDropdown()">
+            <input type="hidden" id="attachLocationSelect" value="_random">
+            <div id="attachLocDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:100; max-height:220px; overflow-y:auto; background:var(--bg-primary); border:1px solid var(--border-light); border-top:none; border-radius:0 0 var(--radius-md) var(--radius-md); box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+            </div>
+          </div>
+          <div id="attachLocSelected" style="margin-top:8px; font-size:13px; color:var(--accent-green); font-weight:600;">Random locations</div>
         </div>
         <div id="attachLocationProgress" style="display:none; margin-top: 16px;">
           <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;" id="attachLocationProgressText">Attaching...</div>
@@ -1963,16 +1968,67 @@
       document.getElementById('attachLocationCount').textContent = selectedChargers.size;
       document.getElementById('attachLocationProgress').style.display = 'none';
       document.getElementById('attachLocationBtn').disabled = false;
-      // Populate location dropdown
       if (plugchoiceSites.length === 0) {
         try { plugchoiceSites = await api('/plugchoice/sites'); } catch(e) {}
       }
-      const sel = document.getElementById('attachLocationSelect');
-      sel.innerHTML = '<option value="_random">Assign to random locations</option>' +
-        plugchoiceSites.map(s => `<option value="${s.uuid}">${s.name} - ${s.city}</option>`).join('');
+      // Reset search state
+      document.getElementById('attachLocSearchInput').value = '';
+      document.getElementById('attachLocationSelect').value = '_random';
+      document.getElementById('attachLocSelected').textContent = 'Random locations';
+      document.getElementById('attachLocSelected').style.color = 'var(--accent-green)';
       document.getElementById('attachLocationModal').classList.add('show');
+      filterAttachLocList();
     }
-    function closeAttachLocationModal() { document.getElementById('attachLocationModal').classList.remove('show'); }
+    function closeAttachLocationModal() {
+      document.getElementById('attachLocationModal').classList.remove('show');
+      document.getElementById('attachLocDropdown').style.display = 'none';
+    }
+
+    function showAttachLocDropdown() {
+      filterAttachLocList();
+      document.getElementById('attachLocDropdown').style.display = 'block';
+    }
+
+    function filterAttachLocList() {
+      const query = document.getElementById('attachLocSearchInput').value.toLowerCase();
+      const dropdown = document.getElementById('attachLocDropdown');
+      const itemStyle = 'padding:8px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--border-light); transition:background 0.1s;';
+      const hoverAttr = 'onmouseenter="this.style.background=\'var(--bg-hover)\'" onmouseleave="this.style.background=\'transparent\'"';
+
+      let html = `<div style="${itemStyle} font-weight:600; color:var(--accent-green);" ${hoverAttr} onclick="selectAttachLoc('_random', 'Random locations')">Assign to random locations</div>`;
+      const matches = plugchoiceSites.filter(s =>
+        !query || s.name.toLowerCase().includes(query) || (s.city||'').toLowerCase().includes(query) || (s.street||'').toLowerCase().includes(query)
+      );
+      for (const s of matches) {
+        const label = `${s.name} — ${s.city || ''}`;
+        const escapedLabel = label.replace(/'/g, "\\'");
+        html += `<div style="${itemStyle}" ${hoverAttr} onclick="selectAttachLoc('${s.uuid}', '${escapedLabel}')">
+          <div style="font-weight:500;">${s.name}</div>
+          <div style="font-size:11px; color:var(--text-muted);">${s.street || ''} ${s.house_number || ''}, ${s.city || ''}</div>
+        </div>`;
+      }
+      if (matches.length === 0 && query) {
+        html += `<div style="${itemStyle} color:var(--text-muted); font-style:italic;">No locations found</div>`;
+      }
+      dropdown.innerHTML = html;
+      dropdown.style.display = 'block';
+    }
+
+    function selectAttachLoc(uuid, label) {
+      document.getElementById('attachLocationSelect').value = uuid;
+      document.getElementById('attachLocSelected').textContent = label;
+      document.getElementById('attachLocSelected').style.color = uuid === '_random' ? 'var(--accent-green)' : 'var(--text-primary)';
+      document.getElementById('attachLocSearchInput').value = '';
+      document.getElementById('attachLocDropdown').style.display = 'none';
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      const wrap = document.getElementById('attachLocSearchWrap');
+      if (wrap && !wrap.contains(e.target)) {
+        document.getElementById('attachLocDropdown').style.display = 'none';
+      }
+    });
 
     async function executeAttachLocation() {
       const siteUuid = document.getElementById('attachLocationSelect').value;
