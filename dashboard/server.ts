@@ -492,6 +492,63 @@ api.delete("/plugchoice/sites/:uuid", async (c) => {
   }
 });
 
+// Get single site details
+api.get("/plugchoice/sites/:uuid/detail", async (c) => {
+  try {
+    const uuid = c.req.param("uuid");
+    const result = await plugchoiceFetch("GET", `/sites/${uuid}`);
+    return c.json(result.data || result);
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured")
+      return c.json({ error: err.message }, 401);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// List chargers at a site (auto-paginated)
+api.get("/plugchoice/sites/:uuid/chargers-list", async (c) => {
+  try {
+    const uuid = c.req.param("uuid");
+    const chargers = await plugchoiceFetchAllPages(`/sites/${uuid}/chargers`);
+    return c.json(chargers);
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured")
+      return c.json({ error: err.message }, 401);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// List cards at a site (auto-paginated)
+api.get("/plugchoice/sites/:uuid/cards", async (c) => {
+  try {
+    const uuid = c.req.param("uuid");
+    const cards = await plugchoiceFetchAllPages(`/sites/${uuid}/cards`);
+    return c.json(cards);
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured")
+      return c.json({ error: err.message }, 401);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Create a card at a site
+api.post("/plugchoice/sites/:uuid/cards", async (c) => {
+  try {
+    const uuid = c.req.param("uuid");
+    const body = await c.req.json();
+    const { name, id_token } = body;
+    if (!name || !id_token) {
+      return c.json({ error: "name and id_token are required" }, 400);
+    }
+    const result = await plugchoiceFetch("POST", `/sites/${uuid}/cards`, { name, id_token });
+    return c.json(result);
+  } catch (err: any) {
+    if (err.message === "No Plugchoice token configured")
+      return c.json({ error: err.message }, 401);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // List all team chargers (auto-paginated)
 api.get("/plugchoice/team-chargers", async (c) => {
   try {
