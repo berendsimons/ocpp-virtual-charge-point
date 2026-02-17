@@ -160,6 +160,25 @@
     tbody tr { cursor: pointer; transition: background 0.1s ease; }
     tbody tr:hover { background: var(--bg-hover); }
     tbody tr:last-child td { border-bottom: none; }
+    /* Filter bar */
+    .filter-bar { padding: 12px 20px; border-bottom: 1px solid var(--border-light); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .filter-bar .form-select { width: auto; padding: 6px 10px; font-size: 13px; border-radius: var(--radius-sm); }
+    .filter-tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--accent-green-light); color: var(--accent-green-dark); border-radius: 100px; font-size: 12px; font-weight: 600; }
+    .filter-tag button { border: none; background: none; color: var(--accent-green-dark); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; font-weight: 700; }
+    .filter-tag button:hover { color: var(--accent-red); }
+    .filter-count { font-size: 13px; color: var(--text-muted); margin-left: auto; }
+
+    /* Select % popover */
+    .select-cell-wrapper { display: flex; align-items: center; gap: 2px; }
+    .select-pct-btn { border: none; background: none; cursor: pointer; color: var(--text-muted); padding: 0 2px; font-size: 10px; line-height: 1; display: flex; align-items: center; }
+    .select-pct-btn:hover { color: var(--accent-green); }
+    .select-pct-popover { position: absolute; top: 100%; left: 0; background: var(--bg-white); border: 1px solid var(--border-light); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); padding: 12px; z-index: 60; display: none; min-width: 180px; }
+    .select-pct-popover.show { display: block; animation: slideInDown 0.15s ease; }
+    .select-pct-popover label { font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px; }
+    .select-pct-row { display: flex; gap: 6px; }
+    .select-pct-row input { width: 70px; padding: 6px 8px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-family: 'Satoshi', sans-serif; font-size: 13px; text-align: center; }
+    .select-pct-row input:focus { outline: none; border-color: var(--accent-green); }
+
     .checkbox-cell { width: 48px; }
     input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent-green); cursor: pointer; }
     .charger-id-cell { font-weight: 600; color: var(--text-primary); }
@@ -448,10 +467,61 @@
                 </div>
                 <div class="selection-info" id="selectionInfo"><strong id="selectedCount">0</strong> selected <button class="btn btn-sm btn-secondary" onclick="clearSelection()">Clear</button></div>
               </div>
-              <button class="btn btn-sm btn-secondary" onclick="showGenerateModal()">Generate Multiple</button>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn btn-sm btn-secondary" onclick="showGenerateModal()">Generate Multiple</button>
+              </div>
+            </div>
+            <div class="filter-bar" id="filterBar">
+              <select class="form-select" id="filterVendor" onchange="filterChargers()"><option value="">All Vendors</option></select>
+              <select class="form-select" id="filterModel" onchange="filterChargers()"><option value="">All Models</option></select>
+              <select class="form-select" id="filterInstall" onchange="filterChargers()">
+                <option value="">All Install</option>
+                <option value="1">1-phase</option>
+                <option value="3">3-phase</option>
+              </select>
+              <select class="form-select" id="filterConnectors" onchange="filterChargers()">
+                <option value="">All # Conn.</option>
+                <option value="1">1 connector</option>
+                <option value="2">2 connectors</option>
+                <option value="3">3 connectors</option>
+              </select>
+              <select class="form-select" id="filterConnection" onchange="filterChargers()">
+                <option value="">All Connection</option>
+                <option value="connected">Connected</option>
+                <option value="disconnected">Disconnected</option>
+              </select>
+              <select class="form-select" id="filterConnectorStatus" onchange="filterChargers()">
+                <option value="">All Connector Status</option>
+                <option value="Available">Available</option>
+                <option value="Preparing">Preparing</option>
+                <option value="Charging">Charging</option>
+                <option value="SuspendedEV">SuspendedEV</option>
+                <option value="SuspendedEVSE">SuspendedEVSE</option>
+                <option value="Finishing">Finishing</option>
+                <option value="Reserved">Reserved</option>
+                <option value="Unavailable">Unavailable</option>
+                <option value="Faulted">Faulted</option>
+              </select>
+              <button class="btn btn-sm btn-secondary" onclick="resetFilters()">Reset</button>
+              <span class="filter-count" id="filterCount"></span>
             </div>
             <table>
-              <thead><tr><th class="checkbox-cell"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"></th><th>Chargepoint ID</th><th>Conn. 0</th><th>Conn. 1</th><th>Conn. 2</th><th>Vendor</th><th>Model</th><th>Install</th></tr></thead>
+              <thead><tr>
+                <th class="checkbox-cell" style="position:relative;">
+                  <div class="select-cell-wrapper">
+                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
+                    <button class="select-pct-btn" onclick="event.stopPropagation(); toggleSelectPctPopover();" title="Select random %">&#9662;</button>
+                  </div>
+                  <div class="select-pct-popover" id="selectPctPopover">
+                    <label>Select random %</label>
+                    <div class="select-pct-row">
+                      <input type="number" id="selectPctInput" min="0" max="100" value="50" placeholder="%" onkeydown="if(event.key==='Enter'){selectRandomPercent();event.preventDefault();}">
+                      <button class="btn btn-sm btn-primary" onclick="selectRandomPercent()">Select</button>
+                    </div>
+                  </div>
+                </th>
+                <th>Chargepoint ID</th><th>Conn. 0</th><th>Conn. 1</th><th>Conn. 2</th><th>Vendor</th><th>Model</th><th>Install</th>
+              </tr></thead>
               <tbody id="chargersTableBody"></tbody>
             </table>
             <div class="table-empty" id="tableEmpty" style="display: none;">
@@ -839,7 +909,10 @@
       renderModels();
       populateModelSelects();
       refreshInterval = setInterval(loadChargers, 5000);
-      document.addEventListener('click', (e) => { if (!e.target.closest('.dropdown')) document.getElementById('actionsDropdown').classList.remove('show'); });
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.dropdown')) document.getElementById('actionsDropdown').classList.remove('show');
+        if (!e.target.closest('.checkbox-cell')) document.getElementById('selectPctPopover').classList.remove('show');
+      });
       updateModelIdPreview();
       ['modelPrefix', 'modelSuffix', 'modelIdLength', 'modelIncludeNumbers', 'modelIncludeLetters'].forEach(id => {
         document.getElementById(id).addEventListener('input', updateModelIdPreview);
@@ -882,16 +955,49 @@
         document.getElementById('navStatusText').textContent = `${status.connectedChargers}/${status.totalChargers} online`;
         document.getElementById('navStatusDot').className = status.connectedChargers > 0 ? 'nav-status-dot' : 'nav-status-dot offline';
         chargers = await api('/chargers');
+        populateFilterOptions();
         renderTable();
         updateStats();
       } catch (err) { console.error('Failed to load chargers:', err); }
     }
 
+    function getFilteredChargers() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const vendor = document.getElementById('filterVendor').value;
+      const model = document.getElementById('filterModel').value;
+      const install = document.getElementById('filterInstall').value;
+      const connCount = document.getElementById('filterConnectors').value;
+      const connection = document.getElementById('filterConnection').value;
+      const connStatus = document.getElementById('filterConnectorStatus').value;
+      return chargers.filter(c => {
+        if (search && !c.cpId.toLowerCase().includes(search)) return false;
+        if (vendor && c.config.vendor !== vendor) return false;
+        if (model && c.config.model !== model) return false;
+        if (install && String(c.config.phases || 3) !== install) return false;
+        if (connCount && String(c.connectors.length) !== connCount) return false;
+        if (connection === 'connected' && !c.connected) return false;
+        if (connection === 'disconnected' && c.connected) return false;
+        if (connStatus && !c.connectors.some(cn => cn.status === connStatus)) return false;
+        return true;
+      });
+    }
+
+    function populateFilterOptions() {
+      const vendors = [...new Set(chargers.map(c => c.config.vendor))].sort();
+      const models = [...new Set(chargers.map(c => c.config.model))].sort();
+      const vendorEl = document.getElementById('filterVendor');
+      const modelEl = document.getElementById('filterModel');
+      const curVendor = vendorEl.value;
+      const curModel = modelEl.value;
+      vendorEl.innerHTML = '<option value="">All Vendors</option>' + vendors.map(v => `<option value="${v}"${v === curVendor ? ' selected' : ''}>${v}</option>`).join('');
+      modelEl.innerHTML = '<option value="">All Models</option>' + models.map(m => `<option value="${m}"${m === curModel ? ' selected' : ''}>${m}</option>`).join('');
+    }
+
     function renderTable() {
       const tbody = document.getElementById('chargersTableBody');
       const empty = document.getElementById('tableEmpty');
-      const search = document.getElementById('searchInput').value.toLowerCase();
-      const filtered = chargers.filter(c => c.cpId.toLowerCase().includes(search));
+      const filtered = getFilteredChargers();
+      document.getElementById('filterCount').textContent = `${filtered.length} / ${chargers.length} chargers`;
       if (filtered.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; document.querySelector('table thead').style.display = 'none'; return; }
       document.querySelector('table thead').style.display = ''; empty.style.display = 'none';
       tbody.innerHTML = filtered.map(charger => {
@@ -922,14 +1028,43 @@
     function toggleSelection(cpId) { if (selectedChargers.has(cpId)) selectedChargers.delete(cpId); else selectedChargers.add(cpId); updateSelectionUI(); }
     function toggleSelectAll() {
       const checked = document.getElementById('selectAllCheckbox').checked;
-      const search = document.getElementById('searchInput').value.toLowerCase();
-      const filtered = chargers.filter(c => c.cpId.toLowerCase().includes(search));
+      const filtered = getFilteredChargers();
       if (checked) filtered.forEach(c => selectedChargers.add(c.cpId)); else filtered.forEach(c => selectedChargers.delete(c.cpId));
       updateSelectionUI(); renderTable();
     }
     function clearSelection() { selectedChargers.clear(); document.getElementById('selectAllCheckbox').checked = false; updateSelectionUI(); renderTable(); }
     function updateSelectionUI() { const count = selectedChargers.size; document.getElementById('selectedCount').textContent = count; document.getElementById('selectionInfo').classList.toggle('show', count > 0); }
-    function filterChargers() { renderTable(); }
+    function filterChargers() { populateFilterOptions(); renderTable(); }
+    function resetFilters() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('filterVendor').value = '';
+      document.getElementById('filterModel').value = '';
+      document.getElementById('filterInstall').value = '';
+      document.getElementById('filterConnectors').value = '';
+      document.getElementById('filterConnection').value = '';
+      document.getElementById('filterConnectorStatus').value = '';
+      filterChargers();
+    }
+    function toggleSelectPctPopover() {
+      const pop = document.getElementById('selectPctPopover');
+      pop.classList.toggle('show');
+      if (pop.classList.contains('show')) document.getElementById('selectPctInput').focus();
+    }
+    function selectRandomPercent() {
+      const pct = Math.min(100, Math.max(0, parseInt(document.getElementById('selectPctInput').value) || 0));
+      const filtered = getFilteredChargers();
+      const count = Math.round(filtered.length * pct / 100);
+      // Shuffle and pick
+      const shuffled = [...filtered].sort(() => Math.random() - 0.5);
+      const picked = shuffled.slice(0, count);
+      // Clear current selection of filtered chargers, then apply new
+      filtered.forEach(c => selectedChargers.delete(c.cpId));
+      picked.forEach(c => selectedChargers.add(c.cpId));
+      document.getElementById('selectPctPopover').classList.remove('show');
+      document.getElementById('selectAllCheckbox').checked = false;
+      updateSelectionUI(); renderTable();
+      showToast(`Selected ${picked.length} of ${filtered.length} chargers (${pct}%)`, 'success');
+    }
 
     // Pages
     function showPage(page) {
