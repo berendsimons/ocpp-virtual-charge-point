@@ -633,9 +633,25 @@
               </div>
               <span class="filter-count" id="locationFilterCount"></span>
             </div>
-            <table>
+            <div class="filter-bar" id="locationFilterBar">
+              <select class="form-select" id="filterLocCity" onchange="renderLocations()"><option value="">All Cities</option></select>
+              <select class="form-select" id="filterLocChargers" onchange="renderLocations()">
+                <option value="">All Charger Counts</option>
+                <option value="0">0 chargers</option>
+                <option value="1-5">1–5 chargers</option>
+                <option value="6+">6+ chargers</option>
+              </select>
+              <button class="action-btn" onclick="resetLocationFilters()" style="font-size:12px;">Reset</button>
+            </div>
+            <table id="locationsTable">
               <thead><tr>
-                <th>Name</th><th>Street</th><th>Nr</th><th>Postal Code</th><th>City</th><th>Chargers</th><th style="width:80px;">Actions</th>
+                <th class="sortable" onclick="sortLocations('name')">Name <span class="sort-icon loc-sort-icon" data-col="name"></span></th>
+                <th class="sortable" onclick="sortLocations('street')">Street <span class="sort-icon loc-sort-icon" data-col="street"></span></th>
+                <th class="sortable" onclick="sortLocations('house_number')">Nr <span class="sort-icon loc-sort-icon" data-col="house_number"></span></th>
+                <th class="sortable" onclick="sortLocations('postal_code')">Postal Code <span class="sort-icon loc-sort-icon" data-col="postal_code"></span></th>
+                <th class="sortable" onclick="sortLocations('city')">City <span class="sort-icon loc-sort-icon" data-col="city"></span></th>
+                <th class="sortable" onclick="sortLocations('chargers_count')">Chargers <span class="sort-icon loc-sort-icon" data-col="chargers_count"></span></th>
+                <th style="width:80px;">Actions</th>
               </tr></thead>
               <tbody id="locationsTableBody"></tbody>
             </table>
@@ -1762,6 +1778,44 @@
     }
 
     // ===== LOCATIONS PAGE =====
+    let locSortColumn = 'name';
+    let locSortDirection = 'asc';
+
+    function sortLocations(column) {
+      if (locSortColumn === column) {
+        locSortDirection = locSortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        locSortColumn = column;
+        locSortDirection = 'asc';
+      }
+      renderLocations();
+    }
+
+    function updateLocSortIcons() {
+      document.querySelectorAll('.loc-sort-icon').forEach(icon => {
+        icon.classList.remove('asc', 'desc');
+        if (icon.dataset.col === locSortColumn) {
+          icon.classList.add(locSortDirection);
+        }
+      });
+    }
+
+    function populateLocationFilters() {
+      const citySet = new Set(plugchoiceSites.map(s => s.city).filter(Boolean));
+      const citySelect = document.getElementById('filterLocCity');
+      const prev = citySelect.value;
+      citySelect.innerHTML = '<option value="">All Cities</option>' +
+        [...citySet].sort().map(c => `<option value="${c}">${c}</option>`).join('');
+      citySelect.value = prev;
+    }
+
+    function resetLocationFilters() {
+      document.getElementById('filterLocCity').value = '';
+      document.getElementById('filterLocChargers').value = '';
+      document.getElementById('locationSearchInput').value = '';
+      renderLocations();
+    }
+
     async function loadLocations() {
       if (!hasPlugchoiceToken) {
         document.getElementById('locationsTokenWarning').style.display = 'block';
@@ -1773,6 +1827,7 @@
       try {
         plugchoiceSites = await api('/plugchoice/sites');
         document.getElementById('locationCountBadge').textContent = plugchoiceSites.length;
+        populateLocationFilters();
         renderLocations();
       } catch(e) { showToast('Failed to load locations', 'error'); }
     }
@@ -1781,7 +1836,35 @@
       const tbody = document.getElementById('locationsTableBody');
       const empty = document.getElementById('locationsTableEmpty');
       const search = document.getElementById('locationSearchInput').value.toLowerCase();
-      const filtered = plugchoiceSites.filter(s => !search || s.name.toLowerCase().includes(search) || (s.city||'').toLowerCase().includes(search) || (s.street||'').toLowerCase().includes(search));
+      const cityFilter = document.getElementById('filterLocCity').value;
+      const chargersFilter = document.getElementById('filterLocChargers').value;
+
+      let filtered = plugchoiceSites.filter(s => {
+        if (search && !s.name.toLowerCase().includes(search) && !(s.city||'').toLowerCase().includes(search) && !(s.street||'').toLowerCase().includes(search) && !(s.postal_code||'').toLowerCase().includes(search)) return false;
+        if (cityFilter && s.city !== cityFilter) return false;
+        if (chargersFilter) {
+          const cnt = s.chargers_count || 0;
+          if (chargersFilter === '0' && cnt !== 0) return false;
+          if (chargersFilter === '1-5' && (cnt < 1 || cnt > 5)) return false;
+          if (chargersFilter === '6+' && cnt < 6) return false;
+        }
+        return true;
+      });
+
+      // Sort
+      filtered.sort((a, b) => {
+        let va = a[locSortColumn], vb = b[locSortColumn];
+        if (locSortColumn === 'chargers_count' || locSortColumn === 'house_number') {
+          va = va || 0; vb = vb || 0;
+          return locSortDirection === 'asc' ? va - vb : vb - va;
+        }
+        va = (va || '').toString().toLowerCase();
+        vb = (vb || '').toString().toLowerCase();
+        const cmp = va.localeCompare(vb);
+        return locSortDirection === 'asc' ? cmp : -cmp;
+      });
+
+      updateLocSortIcons();
       document.getElementById('locationFilterCount').textContent = `${filtered.length} / ${plugchoiceSites.length} locations`;
       if (filtered.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
       empty.style.display = 'none';
