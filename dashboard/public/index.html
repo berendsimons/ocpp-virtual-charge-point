@@ -413,6 +413,10 @@
             <p class="page-subtitle">Manage your virtual charge points</p>
           </div>
           <div class="page-actions">
+            <button class="btn btn-primary" onclick="showQuickDeployModal()" style="background: linear-gradient(135deg, var(--accent-green) 0%, var(--accent-blue) 100%);">
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              Quick Deploy
+            </button>
             <button class="btn btn-secondary" onclick="showAddChargerModal()">
               <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
               Add Charger
@@ -1121,6 +1125,108 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeGenerateLocationsModal()">Cancel</button>
         <button class="btn btn-primary" id="genLocBtn" onclick="executeGenerateLocations()">Generate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Deploy Modal -->
+  <div class="modal-overlay" id="quickDeployModal">
+    <div class="modal" style="width: 640px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 10px;">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--accent-green) 0%,var(--accent-blue) 100%);flex-shrink:0;">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+          </span>
+          Quick Deploy
+        </h3>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">Generate chargers and locations in one go. Chargers will be created locally, connected to OCPP, and attached to new Plugchoice locations with RFID cards and power groups.</p>
+
+        <div class="form-group">
+          <label class="form-label">Charger Model *</label>
+          <select class="form-select" id="qdModelSelect" onchange="onQdModelChange()">
+            <option value="">-- Select a model --</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Number of Locations *</label>
+            <input type="number" class="form-input" id="qdLocationCount" value="5" min="1" max="100" oninput="updateQdPreview()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Chargers per Location *</label>
+            <input type="number" class="form-input" id="qdChargersPerLoc" value="4" min="1" max="50" oninput="updateQdPreview()">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Installation Phases</label>
+            <select class="form-select" id="qdPhases">
+              <option value="3">3-phase (L1+L2+L3+N)</option>
+              <option value="1">1-phase (L1+N)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cards per Location</label>
+            <select class="form-select" id="qdCardsPerLoc">
+              <option value="random">Random (3-5)</option>
+              <option value="3">3 cards</option>
+              <option value="5">5 cards</option>
+              <option value="8">8 cards</option>
+              <option value="10">10 cards</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Connect to OCPP after creation</label>
+            <select class="form-select" id="qdAutoConnect">
+              <option value="y">Yes - Connect all</option>
+              <option value="n">No - Leave disconnected</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Main Fuse (per location)</label>
+            <select class="form-select" id="qdFuseAmps">
+              <option value="random">Random (25-50A)</option>
+              <option value="25">25A</option>
+              <option value="32">32A</option>
+              <option value="35">35A</option>
+              <option value="40">40A</option>
+              <option value="50">50A</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="qdPreview" style="margin-top: 20px; padding: 16px; background: var(--bg-cream); border-radius: var(--radius-sm); display: none;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Deploy Summary</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+            <div><div style="font-size: 22px; font-weight: 900; letter-spacing: -0.5px;" id="qdPreviewChargers">0</div><div style="font-size: 11px; color: var(--text-muted);">Total Chargers</div></div>
+            <div><div style="font-size: 22px; font-weight: 900; letter-spacing: -0.5px;" id="qdPreviewLocations">0</div><div style="font-size: 11px; color: var(--text-muted);">Locations</div></div>
+            <div><div style="font-size: 22px; font-weight: 900; letter-spacing: -0.5px;" id="qdPreviewCards">0</div><div style="font-size: 11px; color: var(--text-muted);">RFID Cards</div></div>
+          </div>
+          <div id="qdPreviewIds" style="margin-top: 12px; font-family: monospace; font-size: 12px; color: var(--text-secondary); line-height: 1.8;"></div>
+        </div>
+
+        <div id="qdProgress" style="display: none; margin-top: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 13px; font-weight: 600; color: var(--text-secondary);" id="qdProgressText">Starting...</span>
+            <span style="font-size: 13px; font-weight: 700; color: var(--accent-green);" id="qdProgressPct">0%</span>
+          </div>
+          <div style="width: 100%; height: 8px; background: var(--border-light); border-radius: 4px; overflow: hidden;">
+            <div id="qdProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--accent-green), var(--accent-blue)); transition: width 0.3s ease; border-radius: 4px;"></div>
+          </div>
+          <div id="qdSteps" style="margin-top: 12px; font-size: 12px; color: var(--text-muted); line-height: 2;">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeQuickDeployModal()">Cancel</button>
+        <button class="btn btn-primary" id="qdDeployBtn" onclick="executeQuickDeploy()" style="background: linear-gradient(135deg, var(--accent-green) 0%, var(--accent-blue) 100%);">Deploy</button>
       </div>
     </div>
   </div>
@@ -2470,6 +2576,223 @@
         // Assign charger to group
         await api(`/plugchoice/sites/${siteUuid}/groups/${groupId}/chargers`, { method: 'POST', body: JSON.stringify({ charger_uuids: [tc.uuid] }) });
       } catch(e) { console.error('Failed to setup charger:', identity, e); }
+    }
+
+    // ===== QUICK DEPLOY =====
+    function showQuickDeployModal() {
+      if (!hasPlugchoiceToken) { showToast('Configure Plugchoice API token in Settings first', 'error'); return; }
+      populateModelSelects();
+      // Populate quick deploy model select
+      const qdSelect = document.getElementById('qdModelSelect');
+      qdSelect.innerHTML = '<option value="">-- Select a model --</option>' +
+        models.map(m => `<option value="${m.id}">${m.vendor} — ${m.name}</option>`).join('');
+      // Reset state
+      document.getElementById('qdProgress').style.display = 'none';
+      document.getElementById('qdPreview').style.display = 'none';
+      document.getElementById('qdDeployBtn').disabled = false;
+      document.getElementById('qdSteps').innerHTML = '';
+      document.getElementById('quickDeployModal').classList.add('show');
+    }
+
+    function closeQuickDeployModal() {
+      document.getElementById('quickDeployModal').classList.remove('show');
+    }
+
+    function onQdModelChange() { updateQdPreview(); }
+
+    function updateQdPreview() {
+      const modelId = document.getElementById('qdModelSelect').value;
+      const locCount = parseInt(document.getElementById('qdLocationCount').value) || 0;
+      const perLoc = parseInt(document.getElementById('qdChargersPerLoc').value) || 0;
+      const cardsVal = document.getElementById('qdCardsPerLoc').value;
+      const preview = document.getElementById('qdPreview');
+
+      if (!modelId || !locCount || !perLoc) { preview.style.display = 'none'; return; }
+      preview.style.display = 'block';
+
+      const totalChargers = locCount * perLoc;
+      const cardsPerLoc = cardsVal === 'random' ? 4 : parseInt(cardsVal);
+      const totalCards = locCount * cardsPerLoc;
+
+      document.getElementById('qdPreviewChargers').textContent = totalChargers;
+      document.getElementById('qdPreviewLocations').textContent = locCount;
+      document.getElementById('qdPreviewCards').textContent = cardsVal === 'random' ? `~${totalCards}` : totalCards;
+
+      const model = models.find(m => m.id === modelId);
+      if (model) {
+        const exIds = [1,2,3].map(() => generateRandomId(model));
+        document.getElementById('qdPreviewIds').innerHTML =
+          `<span style="color:var(--text-muted);">Example IDs:</span> ${exIds.map(id => `<code style="background:var(--bg-white);padding:2px 6px;border-radius:4px;margin:0 2px;">${id}</code>`).join(' ')}`;
+      }
+    }
+
+    function qdStep(id, text, status) {
+      const container = document.getElementById('qdSteps');
+      let el = document.getElementById('qd-step-' + id);
+      const icons = {
+        pending: '<span style="color:var(--text-muted);">&#9675;</span>',
+        active: '<span style="color:var(--accent-blue);animation:pulse 1s infinite;">&#9679;</span>',
+        done: '<span style="color:var(--accent-green);">&#10003;</span>',
+        error: '<span style="color:var(--accent-red);">&#10007;</span>'
+      };
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'qd-step-' + id;
+        el.style.cssText = 'display:flex;align-items:center;gap:8px;';
+        container.appendChild(el);
+      }
+      el.innerHTML = `${icons[status] || icons.pending} <span>${text}</span>`;
+    }
+
+    function qdProgress(pct, text) {
+      document.getElementById('qdProgressBar').style.width = pct + '%';
+      document.getElementById('qdProgressPct').textContent = Math.round(pct) + '%';
+      if (text) document.getElementById('qdProgressText').textContent = text;
+    }
+
+    async function executeQuickDeploy() {
+      const modelId = document.getElementById('qdModelSelect').value;
+      const locCount = parseInt(document.getElementById('qdLocationCount').value) || 0;
+      const perLoc = parseInt(document.getElementById('qdChargersPerLoc').value) || 0;
+      const phases = parseInt(document.getElementById('qdPhases').value) || 3;
+      const cardsVal = document.getElementById('qdCardsPerLoc').value;
+      const autoConnect = document.getElementById('qdAutoConnect').value === 'y';
+      const fuseVal = document.getElementById('qdFuseAmps').value;
+
+      if (!modelId) { showToast('Select a charger model', 'error'); return; }
+      if (!locCount || !perLoc) { showToast('Enter location and charger counts', 'error'); return; }
+
+      const model = models.find(m => m.id === modelId);
+      if (!model) { showToast('Model not found', 'error'); return; }
+
+      const totalChargers = locCount * perLoc;
+      document.getElementById('qdProgress').style.display = 'block';
+      document.getElementById('qdPreview').style.display = 'none';
+      document.getElementById('qdDeployBtn').disabled = true;
+      document.getElementById('qdSteps').innerHTML = '';
+
+      // Total steps for progress: create chargers + connect + create locations + attach + setup
+      const totalSteps = totalChargers + (autoConnect ? totalChargers : 0) + locCount + totalChargers + totalChargers;
+      let completedSteps = 0;
+
+      function advanceProgress(stepCount, text) {
+        completedSteps += stepCount;
+        qdProgress((completedSteps / totalSteps) * 100, text);
+      }
+
+      // ---- STEP 1: Create chargers locally ----
+      qdStep('chargers', `Creating ${totalChargers} chargers...`, 'active');
+      const createdCpIds = [];
+      let chargerErrors = 0;
+      for (let i = 0; i < totalChargers; i++) {
+        const cpId = generateRandomId(model);
+        try {
+          const result = await api('/chargers', { method: 'POST', body: JSON.stringify({
+            cpId, vendor: model.vendor, model: model.name, serialNumber: cpId,
+            connectors: model.connectors, phases,
+            firmwareVersion: model.firmware, meterType: model.meterType,
+            iccid: generateIccid(), imsi: generateImsi(), meterSerialNumber: generateMeterSerial()
+          }) });
+          if (result.success) { createdCpIds.push(cpId); }
+          else { chargerErrors++; }
+        } catch(e) { chargerErrors++; }
+        advanceProgress(1, `Creating chargers... ${i+1}/${totalChargers}`);
+      }
+      qdStep('chargers', `Created ${createdCpIds.length} chargers${chargerErrors ? ` (${chargerErrors} errors)` : ''}`, chargerErrors ? 'error' : 'done');
+
+      // ---- STEP 2: Connect to OCPP ----
+      if (autoConnect && createdCpIds.length > 0) {
+        qdStep('connect', `Connecting ${createdCpIds.length} chargers to OCPP...`, 'active');
+        let connectOk = 0, connectFail = 0;
+        for (let i = 0; i < createdCpIds.length; i++) {
+          try {
+            const resp = await api(`/chargers/${encodeURIComponent(createdCpIds[i])}/connect`, { method: 'POST' });
+            if (resp.success) connectOk++; else connectFail++;
+          } catch(e) { connectFail++; }
+          advanceProgress(1, `Connecting... ${i+1}/${createdCpIds.length}`);
+        }
+        qdStep('connect', `Connected ${connectOk} chargers${connectFail ? ` (${connectFail} failed)` : ''}`, connectFail ? 'error' : 'done');
+      }
+
+      // ---- STEP 3: Create locations on Plugchoice ----
+      qdStep('locations', `Creating ${locCount} locations...`, 'active');
+      const createdSites = []; // { uuid, name }
+      let locErrors = 0;
+      for (let i = 0; i < locCount; i++) {
+        const loc = generateRandomLocation();
+        try {
+          const result = await api('/plugchoice/sites', { method: 'POST', body: JSON.stringify(loc) });
+          const siteUuid = result.data?.uuid || result.uuid;
+          if (siteUuid) {
+            createdSites.push({ uuid: siteUuid, name: loc.name });
+
+            // Create RFID cards
+            const cardCount = cardsVal === 'random' ? (3 + Math.floor(Math.random() * 3)) : parseInt(cardsVal);
+            const cards = pickRandomCards(cardCount);
+            for (const card of cards) {
+              try { await api(`/plugchoice/sites/${siteUuid}/cards`, { method: 'POST', body: JSON.stringify(card) }); }
+              catch(e) { /* card error, non-fatal */ }
+            }
+
+            // Create power group
+            const fuseAmps = fuseVal === 'random' ? [25, 32, 35, 40, 50][Math.floor(Math.random() * 5)] : parseInt(fuseVal);
+            try { await api(`/plugchoice/sites/${siteUuid}/groups`, { method: 'POST', body: JSON.stringify({ net_type: 'TN', total_amps: fuseAmps }) }); }
+            catch(e) { /* group error, non-fatal */ }
+          } else { locErrors++; }
+        } catch(e) { locErrors++; }
+        advanceProgress(1, `Creating locations... ${i+1}/${locCount}`);
+      }
+      qdStep('locations', `Created ${createdSites.length} locations with cards & groups${locErrors ? ` (${locErrors} errors)` : ''}`, locErrors ? 'error' : 'done');
+
+      // ---- STEP 4: Attach chargers to locations (distribute evenly) ----
+      if (createdSites.length > 0 && createdCpIds.length > 0) {
+        qdStep('attach', `Attaching chargers to locations...`, 'active');
+        let attachOk = 0, attachFail = 0;
+
+        // Wait a moment for team chargers to register
+        await new Promise(r => setTimeout(r, 1500));
+
+        for (let i = 0; i < createdCpIds.length; i++) {
+          const site = createdSites[i % createdSites.length]; // round-robin distribution
+          try {
+            const resp = await api(`/plugchoice/sites/${site.uuid}/chargers`, { method: 'POST', body: JSON.stringify({ identity: createdCpIds[i] }) });
+            if (resp.error) { attachFail++; } else { attachOk++; }
+          } catch(e) { attachFail++; }
+          advanceProgress(1, `Attaching... ${i+1}/${createdCpIds.length}`);
+        }
+        qdStep('attach', `Attached ${attachOk} chargers${attachFail ? ` (${attachFail} failed)` : ''}`, attachFail ? 'error' : 'done');
+
+        // ---- STEP 5: Setup each charger (phases, current, group) ----
+        qdStep('setup', `Configuring chargers...`, 'active');
+        _teamChargersCache = null; // force refresh
+        _siteGroupCache = {};
+        let setupOk = 0, setupFail = 0;
+
+        for (let i = 0; i < createdCpIds.length; i++) {
+          const site = createdSites[i % createdSites.length];
+          try {
+            await setupChargerAtSite(createdCpIds[i], site.uuid);
+            setupOk++;
+          } catch(e) { setupFail++; }
+          advanceProgress(1, `Configuring... ${i+1}/${createdCpIds.length}`);
+        }
+        qdStep('setup', `Configured ${setupOk} chargers${setupFail ? ` (${setupFail} failed)` : ''}`, setupFail ? 'error' : 'done');
+      } else {
+        // Skip attach/setup steps in progress
+        advanceProgress(totalChargers * 2, 'Skipped attach (no sites or chargers)');
+      }
+
+      qdProgress(100, 'Deploy complete!');
+      document.getElementById('qdDeployBtn').disabled = false;
+      document.getElementById('qdDeployBtn').textContent = 'Done';
+      document.getElementById('qdDeployBtn').onclick = function() { closeQuickDeployModal(); this.textContent = 'Deploy'; this.onclick = executeQuickDeploy; };
+
+      showToast(`Deployed ${createdCpIds.length} chargers across ${createdSites.length} locations`, 'success');
+
+      // Refresh everything
+      loadChargers();
+      loadChargerSiteMap();
+      loadLocations();
     }
 
     async function executeAttachLocation() {

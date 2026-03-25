@@ -740,6 +740,97 @@
       "meterSerialNumber": "C6O295750",
       "iccid": "8906786491966056765",
       "imsi": "204557210946693"
+    },
+    {
+      "cpId": "EVB-26027582--D",
+      "vendor": "EV-Box",
+      "model": "G4E-M5320E",
+      "serialNumber": "EVB-26027582--D",
+      "firmwareVersion": "P0425B0425v0.240410_W2.2.0",
+      "connectors": 1,
+      "phases": 3,
+      "meterType": "MID",
+      "meterSerialNumber": "V6B141158",
+      "iccid": "8975749276704801883",
+      "imsi": "204009856411614"
+    },
+    {
+      "cpId": "550587168241--D",
+      "vendor": "ChargeAmps",
+      "model": "AURA",
+      "serialNumber": "550587168241--D",
+      "firmwareVersion": "147",
+      "connectors": 2,
+      "phases": 3,
+      "meterType": "MID",
+      "meterSerialNumber": "J6W477810",
+      "iccid": "8971489565471239980",
+      "imsi": "204129466947957"
+    },
+    {
+      "cpId": "854147312369--D",
+      "vendor": "ChargeAmps",
+      "model": "AURA",
+      "serialNumber": "854147312369--D",
+      "firmwareVersion": "147",
+      "connectors": 2,
+      "phases": 3,
+      "meterType": "MID",
+      "meterSerialNumber": "G6M915705",
+      "iccid": "8911547133849556520",
+      "imsi": "204585623174907"
+    },
+    {
+      "cpId": "382057286526--D",
+      "vendor": "ChargeAmps",
+      "model": "AURA",
+      "serialNumber": "382057286526--D",
+      "firmwareVersion": "147",
+      "connectors": 2,
+      "phases": 3,
+      "meterType": "MID",
+      "meterSerialNumber": "F6C005392",
+      "iccid": "8920683699482746632",
+      "imsi": "204514244617676"
+    },
+    {
+      "cpId": "029921803979--D",
+      "vendor": "ChargeAmps",
+      "model": "AURA",
+      "serialNumber": "029921803979--D",
+      "firmwareVersion": "147",
+      "connectors": 2,
+      "phases": 3,
+      "meterType": "MID",
+      "meterSerialNumber": "B6T889122",
+      "iccid": "8989743825745296819",
+      "imsi": "204121122742252"
+    },
+    {
+      "cpId": "570120852586--D",
+      "vendor": "ChargeAmps",
+      "model": "AURA",
+      "serialNumber": "570120852586--D",
+      "firmwareVersion": "147",
+      "connectors": 2,
+      "phases": 3,
+      "meterType": "MID",
+      "meterSerialNumber": "Z6I885194",
+      "iccid": "8936017973247625904",
+      "imsi": "204743321457263"
+    },
+    {
+      "cpId": "463218580007--D",
+      "vendor": "ChargeAmps",
+      "model": "AURA",
+      "serialNumber": "463218580007--D",
+      "firmwareVersion": "147",
+      "connectors": 2,
+      "phases": 3,
+      "meterType": "MID",
+      "meterSerialNumber": "B6B612720",
+      "iccid": "8955695270830038963",
+      "imsi": "204683581622393"
     }
   ]
 }
