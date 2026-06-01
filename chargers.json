@@ -831,6 +831,45 @@
       "meterSerialNumber": "B6B612720",
       "iccid": "8955695270830038963",
       "imsi": "204683581622393"
+    },
+    {
+      "cpId": "50five-4999878--D",
+      "vendor": "Alfen",
+      "model": "NG920-61001",
+      "serialNumber": "50five-4999878--D",
+      "firmwareVersion": "7.2.9-4297",
+      "connectors": 1,
+      "phases": 3,
+      "meterType": "MID",
+      "meterSerialNumber": "I6J448989",
+      "iccid": "8968688990501882341",
+      "imsi": "204942123796631"
+    },
+    {
+      "cpId": "50five-4999877--D",
+      "vendor": "Peblar",
+      "model": "Business",
+      "serialNumber": "50five-4999877--D",
+      "firmwareVersion": "2.5",
+      "connectors": 1,
+      "phases": 3,
+      "meterType": "MID",
+      "meterSerialNumber": "S6R027780",
+      "iccid": "8920784776300983331",
+      "imsi": "204762383212270"
+    },
+    {
+      "cpId": "50five-4999876--D",
+      "vendor": "Ratio",
+      "model": "io7",
+      "serialNumber": "50five-4999876--D",
+      "firmwareVersion": "1.5.2",
+      "connectors": 2,
+      "phases": 3,
+      "meterType": "MID",
+      "meterSerialNumber": "I6V536566",
+      "iccid": "8944752299671347131",
+      "imsi": "204429217392740"
     }
   ]
 }
